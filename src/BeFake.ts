@@ -5,6 +5,7 @@ import * as path from "path";
 import sharp from "sharp"; // to download and resize images
 import moment from "moment";
 
+// TODO: add error codes and etc
 export default class BeFake {
     // TODO: add the coresponding types
     //* Types
@@ -133,6 +134,16 @@ export default class BeFake {
             );
             // parse the JSON
             const obj = JSON.parse(data);
+
+            // check if token is expired
+            if (
+                !moment(obj.access.expires).isBefore(moment()) ||
+                !moment(obj.firebase.expires).isBefore(moment())
+            ) {
+                console.log("Token expired, please login again");
+                return;
+            }
+
             // set the tokens
             this.refresh_token = obj.access.refresh_token;
             this.token = obj.access.token;
@@ -142,9 +153,6 @@ export default class BeFake {
             this.firebaseExpiration = moment(obj.firebase.expires);
             this.userId = obj.userId;
             console.log("Loaded token successfully");
-            // refresh and save the tokens
-            await this.firebaseRefreshTokens();
-            await this.saveToken();
         } catch (error) {
             console.log(
                 "Something went wrong while getting token, please login again",
@@ -475,5 +483,24 @@ export default class BeFake {
             page ? { page: page } : {} // if page is defined, send it
         );
         return response;
+    }
+
+    // Post a photo
+    async postPhoto(location?: [number, number]) {
+        // imgs paths
+        const img1Path = path.join(this.dataPath, "post", "img1.jpg");
+        const img2Path = path.join(
+            __dirname,
+            this.dataPath,
+            "post",
+            "img2.jpg"
+        );
+        // create location string (still idk why but yes)
+        if (location) {
+            const locationStr = `<Location ${location[0]} ${location[1]}>`;
+        }
+        // Get bytes from imgs
+        const img1Bytes = Buffer.from(fs.readFileSync(img1Path));
+        console.log(img1Bytes);
     }
 }

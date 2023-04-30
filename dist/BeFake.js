@@ -40,6 +40,7 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const sharp_1 = __importDefault(require("sharp")); // to download and resize images
 const moment_1 = __importDefault(require("moment"));
+// TODO: add error codes and etc
 class BeFake {
     constructor(refresh_token = null, proxies = null, disable_ssl = false, deviceId = null
     ///api_url?,
@@ -125,6 +126,12 @@ class BeFake {
                 const data = yield fs.readFileSync("./programData/USER_INFO.json", "utf8");
                 // parse the JSON
                 const obj = JSON.parse(data);
+                // check if token is expired
+                if (!(0, moment_1.default)(obj.access.expires).isBefore((0, moment_1.default)()) ||
+                    !(0, moment_1.default)(obj.firebase.expires).isBefore((0, moment_1.default)())) {
+                    console.log("Token expired, please login again");
+                    return;
+                }
                 // set the tokens
                 this.refresh_token = obj.access.refresh_token;
                 this.token = obj.access.token;
@@ -134,9 +141,6 @@ class BeFake {
                 this.firebaseExpiration = (0, moment_1.default)(obj.firebase.expires);
                 this.userId = obj.userId;
                 console.log("Loaded token successfully");
-                // refresh and save the tokens
-                yield this.firebaseRefreshTokens();
-                yield this.saveToken();
             }
             catch (error) {
                 console.log("Something went wrong while getting token, please login again", error);
@@ -404,6 +408,21 @@ class BeFake {
             page ? { page: page } : {} // if page is defined, send it
             );
             return response;
+        });
+    }
+    // Post a photo
+    postPhoto(location) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // imgs paths
+            const img1Path = path.join(this.dataPath, "post", "img1.jpg");
+            const img2Path = path.join(__dirname, this.dataPath, "post", "img2.jpg");
+            // create location string (still idk why but yes)
+            if (location) {
+                const locationStr = `<Location ${location[0]} ${location[1]}>`;
+            }
+            // Get bytes from imgs
+            const img1Bytes = Buffer.from(fs.readFileSync(img1Path));
+            console.log(img1Bytes);
         });
     }
 }
