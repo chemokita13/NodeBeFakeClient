@@ -36,10 +36,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = __importDefault(require("axios"));
-///const fs = require("fs");
 const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const sharp_1 = __importDefault(require("sharp")); // to download and resize images
 const moment_1 = __importDefault(require("moment"));
-//TODO: save token to avoid login each time
 class BeFake {
     constructor(refresh_token = null, proxies = null, disable_ssl = false, deviceId = null
     ///api_url?,
@@ -53,6 +53,7 @@ class BeFake {
                 "user-agent": "BeReal/1.0.1 (AlexisBarreyat.BeReal; build:9513; iOS 16.0.2) 1.0.0/BRApriKit",
                 "x-ios-bundle-identifier": "AlexisBarreyat.BeReal",
             });
+        this.dataPath = "programData";
     }
     // Generate a random device id, (random string with 16chars)
     generateRandomDeviceId() {
@@ -105,9 +106,14 @@ class BeFake {
                 },
                 userId: this.userId,
             };
-            // save the obkect to a JSON file
-            yield fs.writeFile("./programData/USER_INFO.json", JSON.stringify(objToSave), () => {
-                console.log("Saved");
+            // Check if the folder exists
+            if (!fs.existsSync(this.dataPath)) {
+                // If doesn't exist, create it
+                fs.mkdirSync(this.dataPath);
+            }
+            // save the object to a JSON file
+            yield fs.writeFile(path.join(this.dataPath, "USER_INFO.json"), JSON.stringify(objToSave, null, 4), () => {
+                console.log("Saved tokens file");
             });
         });
     }
@@ -250,9 +256,91 @@ class BeFake {
             return response.data;
         });
     }
-    getFriendsFeed() {
+    getFriendsFeed(option) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log(yield this.apiRequest("GET", "feeds/friends"));
+            /**
+             * option:
+             * 0: print data
+             * 1: save JSON file with data
+             * 2: create path and user folders with data and download images
+             */
+            const response = yield this.apiRequest("GET", "feeds/friends");
+            if (option > 0 && option > 3) {
+                console.log("Invalid option, please try again");
+                return;
+            }
+            if (option == 0) {
+                console.log(response);
+            }
+            if (option == 1) {
+                yield fs.writeFile(path.join("programData", "friendsFeed.json"), JSON.stringify(response, null, 4), () => {
+                    console.log("File created successfully");
+                });
+                return;
+            }
+            if (option == 2) {
+                const feedPath = path.join(this.dataPath, "friendsFeed");
+                // Check if the folder exists
+                if (!fs.existsSync(feedPath)) {
+                    // If doesn't exist, create it
+                    fs.mkdirSync(feedPath);
+                }
+                else {
+                    // If exists, delete it and create it again
+                    fs.rmSync(feedPath, { recursive: true });
+                    fs.mkdirSync(feedPath);
+                }
+                for (let i = 0; i < response.length; i++) {
+                    const friendPath = path.join(feedPath, response[i].userName);
+                    // Check if the folder exists
+                    if (!fs.existsSync(friendPath)) {
+                        // If doesn't exist, create it
+                        yield fs.mkdirSync(friendPath);
+                    }
+                    else {
+                        // If exists, delete it and create it again
+                        fs.rmSync(friendPath, { recursive: true });
+                        fs.mkdirSync(friendPath);
+                    }
+                    // create photos folder
+                    const imagesPath = path.join(friendPath, "images");
+                    if (!fs.existsSync(imagesPath)) {
+                        // If doesn't exist, create it
+                        fs.mkdirSync(imagesPath);
+                    }
+                    // Save user.json info
+                    yield fs.writeFile(path.join(friendPath, "user.json"), JSON.stringify(response[i], null, 4), () => {
+                        console.log("user.json created successfully", response[i].userName);
+                    });
+                    //* Save images
+                    // Primary image
+                    const primaryImage = yield axios_1.default.get(response[i].photoURL, {
+                        responseType: "arraybuffer",
+                    });
+                    console.log(primaryImage.data);
+                    yield (0, sharp_1.default)(primaryImage.data)
+                        .toFormat("jpg")
+                        .toFile(path.join(imagesPath, "primary.jpg"));
+                    // Secondary image
+                    const secondaryImage = yield axios_1.default.get(response[i].secondaryPhotoURL, {
+                        responseType: "arraybuffer",
+                    });
+                    yield (0, sharp_1.default)(secondaryImage.data)
+                        .toFormat("jpg")
+                        .toFile(path.join(imagesPath, "secondary.jpg"));
+                    // Profile img
+                    /// if doesn't exist, continue
+                    if (!response[i].user.profilePicture)
+                        continue;
+                    const profileImage = yield axios_1.default.get(response[i].user.profilePicture.url, {
+                        responseType: "arraybuffer",
+                    });
+                    yield (0, sharp_1.default)(profileImage.data)
+                        .toFormat("jpg")
+                        .toFile(path.join(imagesPath, "profile.jpg"));
+                }
+            }
+            return;
         });
     }
 }
