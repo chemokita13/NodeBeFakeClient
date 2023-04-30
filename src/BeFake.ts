@@ -142,6 +142,9 @@ export default class BeFake {
             this.firebaseExpiration = moment(obj.firebase.expires);
             this.userId = obj.userId;
             console.log("Loaded token successfully");
+            // refresh and save the tokens
+            await this.firebaseRefreshTokens();
+            await this.saveToken();
         } catch (error) {
             console.log(
                 "Something went wrong while getting token, please login again",
@@ -284,6 +287,7 @@ export default class BeFake {
         return;
     }
 
+    // make all BeReal's API requests
     async apiRequest(
         method: string,
         endpoint: string,
@@ -297,6 +301,8 @@ export default class BeFake {
             headers: {
                 Authorization: "Bearer " + this.token,
             },
+            data: data,
+            params: params,
         });
         return response.data;
     }
@@ -305,18 +311,18 @@ export default class BeFake {
     async getFriendsFeed(option: number): Promise<any> {
         /**
          * option:
-         * 0: print data
+         * 0: return data
          * 1: save JSON file with data
          * 2: create path and user folders with data and download images
          */
         const response = await this.apiRequest("GET", "feeds/friends");
-        if (option > 0 || option > 3) {
+        if (option < 0 || option > 3) {
             console.log("Invalid option, please try again");
             return;
         }
         try {
             if (option == 0) {
-                console.log(response);
+                return response;
             }
             if (option == 1) {
                 await fs.writeFile(
@@ -412,10 +418,11 @@ export default class BeFake {
         }
     }
 
+    // Get friends info
     async getFriends(option: number): Promise<any> {
         /**
          * option:
-         * 0: print data
+         * 0: return data
          * 1: save JSON file with data
          * */
         if (option < 0 || option > 1) {
@@ -424,7 +431,7 @@ export default class BeFake {
         }
         const response = await this.apiRequest("GET", "relationships/friends");
         if (option == 0) {
-            console.log(response);
+            return response;
         } else {
             // check if programData folder exists
             if (!fs.existsSync("programData")) {
@@ -439,5 +446,34 @@ export default class BeFake {
                 }
             );
         }
+    }
+
+    // Comment a post
+    async commentPost(postId: string, comment: string): Promise<any> {
+        // Prepare the data to send in the request
+        const payload = {
+            postId: postId,
+        };
+        const data = {
+            content: comment,
+        };
+        const response = await this.apiRequest(
+            "POST",
+            "content/comments",
+            data,
+            payload
+        );
+        return response;
+    }
+
+    // Get friend suggestions
+    async getFriendSuggestions(page?: number): Promise<any> {
+        const response = await this.apiRequest(
+            "GET",
+            "relationships/suggestions",
+            {}, // data empty
+            page ? { page: page } : {} // if page is defined, send it
+        );
+        return response;
     }
 }

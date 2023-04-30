@@ -134,6 +134,9 @@ class BeFake {
                 this.firebaseExpiration = (0, moment_1.default)(obj.firebase.expires);
                 this.userId = obj.userId;
                 console.log("Loaded token successfully");
+                // refresh and save the tokens
+                yield this.firebaseRefreshTokens();
+                yield this.saveToken();
             }
             catch (error) {
                 console.log("Something went wrong while getting token, please login again", error);
@@ -243,7 +246,8 @@ class BeFake {
             return;
         });
     }
-    apiRequest(method, endpoint) {
+    // make all BeReal's API requests
+    apiRequest(method, endpoint, data, params) {
         return __awaiter(this, void 0, void 0, function* () {
             //?console.log("Requesting " + this.token);
             const response = yield (0, axios_1.default)({
@@ -252,6 +256,8 @@ class BeFake {
                 headers: {
                     Authorization: "Bearer " + this.token,
                 },
+                data: data,
+                params: params,
             });
             return response.data;
         });
@@ -261,18 +267,18 @@ class BeFake {
         return __awaiter(this, void 0, void 0, function* () {
             /**
              * option:
-             * 0: print data
+             * 0: return data
              * 1: save JSON file with data
              * 2: create path and user folders with data and download images
              */
             const response = yield this.apiRequest("GET", "feeds/friends");
-            if (option > 0 || option > 3) {
+            if (option < 0 || option > 3) {
                 console.log("Invalid option, please try again");
                 return;
             }
             try {
                 if (option == 0) {
-                    console.log(response);
+                    return response;
                 }
                 if (option == 1) {
                     yield fs.writeFile(path.join("programData", "friendsFeed.json"), JSON.stringify(response, null, 4), () => {
@@ -349,11 +355,12 @@ class BeFake {
             }
         });
     }
+    // Get friends info
     getFriends(option) {
         return __awaiter(this, void 0, void 0, function* () {
             /**
              * option:
-             * 0: print data
+             * 0: return data
              * 1: save JSON file with data
              * */
             if (option < 0 || option > 1) {
@@ -362,7 +369,7 @@ class BeFake {
             }
             const response = yield this.apiRequest("GET", "relationships/friends");
             if (option == 0) {
-                console.log(response);
+                return response;
             }
             else {
                 // check if programData folder exists
@@ -374,6 +381,29 @@ class BeFake {
                     console.log("File created successfully");
                 });
             }
+        });
+    }
+    // Comment a post
+    commentPost(postId, comment) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // Prepare the data to send in the request
+            const payload = {
+                postId: postId,
+            };
+            const data = {
+                content: comment,
+            };
+            const response = yield this.apiRequest("POST", "content/comments", data, payload);
+            return response;
+        });
+    }
+    // Get friend suggestions
+    getFriendSuggestions(page) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const response = yield this.apiRequest("GET", "relationships/suggestions", {}, // data empty
+            page ? { page: page } : {} // if page is defined, send it
+            );
+            return response;
         });
     }
 }
