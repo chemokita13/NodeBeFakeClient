@@ -19,20 +19,21 @@ function myBf() {
     return __awaiter(this, void 0, void 0, function* () {
         const mybd = new BeFake_1.default();
         yield mybd.loadToken();
-        yield mybd.getFriends(1);
+        console.log(yield mybd.getFriendSuggestions(1));
     });
 }
 myBf();
 /// IGNORE THIS
 /**
  *
+ *
   
       //* number random with spain code
-        await mybd.sendOtpVonage("+34641564704");
+        
+ await mybd.sendOtpVonage(number);
     const otp = input("Enter OTP: ");
     await mybd.verifyOtpVonage(otp);
-
-
+await mybd.commentPost("LR5yBa893QfW_VvFV7KHc", "hola");
 
      await mybd.getFriendsFeed(2);
  *
