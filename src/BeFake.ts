@@ -1,5 +1,8 @@
 import axios from "axios";
 
+///const fs = require("fs");
+import * as fs from "fs";
+
 import moment from "moment";
 
 //TODO: save token to avoid login each time
@@ -74,7 +77,7 @@ export default class BeFake {
                 },
             }
         );
-        console.log(response.status);
+
         if (response.status == 200) {
             console.log(
                 "OTP sent to " + phoneNumber + " successfully, requestId: ",
@@ -84,6 +87,59 @@ export default class BeFake {
             //?console.log(this.getSelf());
         } else {
             console.log("OTP not sent, error: ", response.data);
+        }
+    }
+
+    async saveToken(): Promise<void> {
+        // create an object with the tokens and the userId
+        const objToSave = {
+            access: {
+                refresh_token: this.refresh_token,
+                token: this.token,
+                expires: this.expiration.format(),
+            },
+            firebase: {
+                refresh_token: this.firebase_refresh_token,
+                token: this.firebaseToken,
+                expires: this.firebaseExpiration.format(),
+            },
+            userId: this.userId,
+        };
+
+        // save the obkect to a JSON file
+        await fs.writeFile(
+            "./programData/USER_INFO.json",
+            JSON.stringify(objToSave),
+            () => {
+                console.log("Saved");
+            }
+        );
+    }
+
+    // load the tokens from a JSON file
+    async loadToken(): Promise<void> {
+        try {
+            // read the file
+            const data = await fs.readFileSync(
+                "./programData/USER_INFO.json",
+                "utf8"
+            );
+            // parse the JSON
+            const obj = JSON.parse(data);
+            // set the tokens
+            this.refresh_token = obj.access.refresh_token;
+            this.token = obj.access.token;
+            this.expiration = moment(obj.access.expires);
+            this.firebase_refresh_token = obj.firebase.refresh_token;
+            this.firebaseToken = obj.firebase.token;
+            this.firebaseExpiration = moment(obj.firebase.expires);
+            this.userId = obj.userId;
+            console.log("Loaded token successfully");
+        } catch (error) {
+            console.log(
+                "Something went wrong while getting token, please login again",
+                error
+            );
         }
     }
 
@@ -126,10 +182,10 @@ export default class BeFake {
             return;
         }
 
-        console.log(
-            "Token verified successfully, refreshToken: ",
-            tokenRes.data.refreshToken
-        );
+        // console.log(
+        //     "Token verified successfully, refreshToken: ",
+        //     tokenRes.data.refreshToken
+        // );
 
         // set the token
         this.firebase_refresh_token = tokenRes.data.refreshToken;
@@ -138,6 +194,8 @@ export default class BeFake {
         await this.firebaseRefreshTokens();
         // grant the access token
         await this.grantAccessToken();
+        // save user info (tokens, userId...)
+        await this.saveToken();
     }
 
     // upload the token for avoid expiration
@@ -166,7 +224,8 @@ export default class BeFake {
             return;
         }
 
-        this.firebase_refresh_token = response.data.refreshToken;
+        //!console.log(response.data.refresh_token);
+        this.firebase_refresh_token = response.data.refresh_token;
         this.firebaseToken = response.data.id_token;
         this.firebaseExpiration = moment().add(
             parseInt(response.data.expires_in),
@@ -219,7 +278,7 @@ export default class BeFake {
     }
 
     async apiRequest(method: string, endpoint: string): Promise<any> {
-        console.log("Requesting " + this.token);
+        //?console.log("Requesting " + this.token);
         const response = await axios({
             method: method,
             url: this.api_url + "/" + endpoint,

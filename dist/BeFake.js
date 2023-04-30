@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -13,7 +36,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = __importDefault(require("axios"));
+///const fs = require("fs");
+const fs = __importStar(require("fs"));
 const moment_1 = __importDefault(require("moment"));
+//TODO: save token to avoid login each time
 class BeFake {
     constructor(refresh_token = null, proxies = null, disable_ssl = false, deviceId = null
     ///api_url?,
@@ -53,7 +79,6 @@ class BeFake {
                     "user-agent": "BeReal/8586 CFNetwork/1240.0.4 Darwin/20.6.0",
                 },
             });
-            console.log(response.status);
             if (response.status == 200) {
                 console.log("OTP sent to " + phoneNumber + " successfully, requestId: ", response.data.vonageRequestId);
                 this.otpSession = response.data.vonageRequestId;
@@ -61,6 +86,51 @@ class BeFake {
             }
             else {
                 console.log("OTP not sent, error: ", response.data);
+            }
+        });
+    }
+    saveToken() {
+        return __awaiter(this, void 0, void 0, function* () {
+            // create an object with the tokens and the userId
+            const objToSave = {
+                access: {
+                    refresh_token: this.refresh_token,
+                    token: this.token,
+                    expires: this.expiration.format(),
+                },
+                firebase: {
+                    refresh_token: this.firebase_refresh_token,
+                    token: this.firebaseToken,
+                    expires: this.firebaseExpiration.format(),
+                },
+                userId: this.userId,
+            };
+            // save the obkect to a JSON file
+            yield fs.writeFile("./programData/USER_INFO.json", JSON.stringify(objToSave), () => {
+                console.log("Saved");
+            });
+        });
+    }
+    // load the tokens from a JSON file
+    loadToken() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // read the file
+                const data = yield fs.readFileSync("./programData/USER_INFO.json", "utf8");
+                // parse the JSON
+                const obj = JSON.parse(data);
+                // set the tokens
+                this.refresh_token = obj.access.refresh_token;
+                this.token = obj.access.token;
+                this.expiration = (0, moment_1.default)(obj.access.expires);
+                this.firebase_refresh_token = obj.firebase.refresh_token;
+                this.firebaseToken = obj.firebase.token;
+                this.firebaseExpiration = (0, moment_1.default)(obj.firebase.expires);
+                this.userId = obj.userId;
+                console.log("Loaded token successfully");
+            }
+            catch (error) {
+                console.log("Something went wrong while getting token, please login again", error);
             }
         });
     }
@@ -92,13 +162,18 @@ class BeFake {
                 console.log("Token verification failed, error: ", tokenRes);
                 return;
             }
-            console.log("Token verified successfully, refreshToken: ", tokenRes.data.refreshToken);
+            // console.log(
+            //     "Token verified successfully, refreshToken: ",
+            //     tokenRes.data.refreshToken
+            // );
             // set the token
             this.firebase_refresh_token = tokenRes.data.refreshToken;
             // refresh the token
             yield this.firebaseRefreshTokens();
             // grant the access token
             yield this.grantAccessToken();
+            // save user info (tokens, userId...)
+            yield this.saveToken();
         });
     }
     // upload the token for avoid expiration
@@ -121,7 +196,8 @@ class BeFake {
                 console.log("Token refresh failed(l164), error: ", response.data);
                 return;
             }
-            this.firebase_refresh_token = response.data.refreshToken;
+            //!console.log(response.data.refresh_token);
+            this.firebase_refresh_token = response.data.refresh_token;
             this.firebaseToken = response.data.id_token;
             this.firebaseExpiration = (0, moment_1.default)().add(parseInt(response.data.expires_in), "seconds");
             this.userId = response.data.user_id;
@@ -150,7 +226,7 @@ class BeFake {
                 console.log("Token refresh failed, error: ", response.data);
                 return;
             }
-            //?console.log(response);
+            //!
             // this.tokenInfo = JSON.parse(
             //     atob(response.data.access_token.split(".")[1] + "==")
             // );
@@ -163,7 +239,7 @@ class BeFake {
     }
     apiRequest(method, endpoint) {
         return __awaiter(this, void 0, void 0, function* () {
-            console.log("Requesting " + this.token);
+            //?console.log("Requesting " + this.token);
             const response = yield (0, axios_1.default)({
                 method: method,
                 url: this.api_url + "/" + endpoint,
