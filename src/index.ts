@@ -6,7 +6,7 @@ async function myBf() {
     const mybd = new BeFake();
     await mybd.loadToken();
 
-    await mybd.getFriendsFeed(2);
+    await mybd.getFriends(1);
 }
 
 myBf();
@@ -15,9 +15,13 @@ myBf();
 /**
  * 
   
-      
-  await mybd.sendOtpVonage("+34641564704"); // number random with spain code
+      //* number random with spain code 
+        await mybd.sendOtpVonage("+34641564704");
     const otp = input("Enter OTP: ");
     await mybd.verifyOtpVonage(otp);
+
+
+
+     await mybd.getFriendsFeed(2);
  * 
  */

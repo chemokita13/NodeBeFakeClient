@@ -256,6 +256,7 @@ class BeFake {
             return response.data;
         });
     }
+    // TODO: optimize this function (i think is done without the best way)
     getFriendsFeed(option) {
         return __awaiter(this, void 0, void 0, function* () {
             /**
@@ -265,82 +266,114 @@ class BeFake {
              * 2: create path and user folders with data and download images
              */
             const response = yield this.apiRequest("GET", "feeds/friends");
-            if (option > 0 && option > 3) {
+            if (option > 0 || option > 3) {
                 console.log("Invalid option, please try again");
                 return;
             }
-            if (option == 0) {
-                console.log(response);
-            }
-            if (option == 1) {
-                yield fs.writeFile(path.join("programData", "friendsFeed.json"), JSON.stringify(response, null, 4), () => {
-                    console.log("File created successfully");
-                });
-                return;
-            }
-            if (option == 2) {
-                const feedPath = path.join(this.dataPath, "friendsFeed");
-                // Check if the folder exists
-                if (!fs.existsSync(feedPath)) {
-                    // If doesn't exist, create it
-                    fs.mkdirSync(feedPath);
+            try {
+                if (option == 0) {
+                    console.log(response);
                 }
-                else {
-                    // If exists, delete it and create it again
-                    fs.rmSync(feedPath, { recursive: true });
-                    fs.mkdirSync(feedPath);
+                if (option == 1) {
+                    yield fs.writeFile(path.join("programData", "friendsFeed.json"), JSON.stringify(response, null, 4), () => {
+                        console.log("File created successfully");
+                    });
+                    return;
                 }
-                for (let i = 0; i < response.length; i++) {
-                    const friendPath = path.join(feedPath, response[i].userName);
+                if (option == 2) {
+                    const feedPath = path.join(this.dataPath, "friendsFeed");
                     // Check if the folder exists
-                    if (!fs.existsSync(friendPath)) {
+                    if (!fs.existsSync(feedPath)) {
                         // If doesn't exist, create it
-                        yield fs.mkdirSync(friendPath);
+                        fs.mkdirSync(feedPath);
                     }
                     else {
                         // If exists, delete it and create it again
-                        fs.rmSync(friendPath, { recursive: true });
-                        fs.mkdirSync(friendPath);
+                        fs.rmSync(feedPath, { recursive: true });
+                        fs.mkdirSync(feedPath);
                     }
-                    // create photos folder
-                    const imagesPath = path.join(friendPath, "images");
-                    if (!fs.existsSync(imagesPath)) {
-                        // If doesn't exist, create it
-                        fs.mkdirSync(imagesPath);
+                    for (let i = 0; i < response.length; i++) {
+                        const friendPath = path.join(feedPath, response[i].userName);
+                        // Check if the folder exists
+                        if (!fs.existsSync(friendPath)) {
+                            // If doesn't exist, create it
+                            yield fs.mkdirSync(friendPath);
+                        }
+                        else {
+                            // If exists, delete it and create it again
+                            fs.rmSync(friendPath, { recursive: true });
+                            fs.mkdirSync(friendPath);
+                        }
+                        // create photos folder
+                        const imagesPath = path.join(friendPath, "images");
+                        if (!fs.existsSync(imagesPath)) {
+                            // If doesn't exist, create it
+                            fs.mkdirSync(imagesPath);
+                        }
+                        // Save user.json info
+                        yield fs.writeFile(path.join(friendPath, "user.json"), JSON.stringify(response[i], null, 4), () => {
+                            console.log("user.json created successfully", response[i].userName);
+                        });
+                        //* Save images
+                        // Primary image
+                        const primaryImage = yield axios_1.default.get(response[i].photoURL, {
+                            responseType: "arraybuffer",
+                        });
+                        console.log(primaryImage.data);
+                        yield (0, sharp_1.default)(primaryImage.data)
+                            .toFormat("jpg")
+                            .toFile(path.join(imagesPath, "primary.jpg"));
+                        // Secondary image
+                        const secondaryImage = yield axios_1.default.get(response[i].secondaryPhotoURL, {
+                            responseType: "arraybuffer",
+                        });
+                        yield (0, sharp_1.default)(secondaryImage.data)
+                            .toFormat("jpg")
+                            .toFile(path.join(imagesPath, "secondary.jpg"));
+                        // Profile img
+                        /// if doesn't exist, continue
+                        if (!response[i].user.profilePicture)
+                            continue;
+                        const profileImage = yield axios_1.default.get(response[i].user.profilePicture.url, {
+                            responseType: "arraybuffer",
+                        });
+                        yield (0, sharp_1.default)(profileImage.data)
+                            .toFormat("jpg")
+                            .toFile(path.join(imagesPath, "profile.jpg"));
                     }
-                    // Save user.json info
-                    yield fs.writeFile(path.join(friendPath, "user.json"), JSON.stringify(response[i], null, 4), () => {
-                        console.log("user.json created successfully", response[i].userName);
-                    });
-                    //* Save images
-                    // Primary image
-                    const primaryImage = yield axios_1.default.get(response[i].photoURL, {
-                        responseType: "arraybuffer",
-                    });
-                    console.log(primaryImage.data);
-                    yield (0, sharp_1.default)(primaryImage.data)
-                        .toFormat("jpg")
-                        .toFile(path.join(imagesPath, "primary.jpg"));
-                    // Secondary image
-                    const secondaryImage = yield axios_1.default.get(response[i].secondaryPhotoURL, {
-                        responseType: "arraybuffer",
-                    });
-                    yield (0, sharp_1.default)(secondaryImage.data)
-                        .toFormat("jpg")
-                        .toFile(path.join(imagesPath, "secondary.jpg"));
-                    // Profile img
-                    /// if doesn't exist, continue
-                    if (!response[i].user.profilePicture)
-                        continue;
-                    const profileImage = yield axios_1.default.get(response[i].user.profilePicture.url, {
-                        responseType: "arraybuffer",
-                    });
-                    yield (0, sharp_1.default)(profileImage.data)
-                        .toFormat("jpg")
-                        .toFile(path.join(imagesPath, "profile.jpg"));
                 }
+                return;
             }
-            return;
+            catch (error) {
+                console.log("Something went wrong", error);
+            }
+        });
+    }
+    getFriends(option) {
+        return __awaiter(this, void 0, void 0, function* () {
+            /**
+             * option:
+             * 0: print data
+             * 1: save JSON file with data
+             * */
+            if (option < 0 || option > 1) {
+                console.log("Invalid option, please try again");
+                return;
+            }
+            const response = yield this.apiRequest("GET", "relationships/friends");
+            if (option == 0) {
+                console.log(response);
+            }
+            else {
+                // check if programData folder exists
+                if (!fs.existsSync("programData")) {
+                    // If doesn't exist, create it
+                    fs.mkdirSync("programData");
+                }
+                yield fs.writeFile(path.join("programData", "friends.json"), JSON.stringify(response, null, 4), () => {
+                    console.log("File created successfully");
+                });
+            }
         });
     }
 }

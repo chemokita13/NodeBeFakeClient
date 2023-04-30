@@ -284,7 +284,12 @@ export default class BeFake {
         return;
     }
 
-    async apiRequest(method: string, endpoint: string): Promise<any> {
+    async apiRequest(
+        method: string,
+        endpoint: string,
+        data?: object,
+        params?: object
+    ): Promise<any> {
         //?console.log("Requesting " + this.token);
         const response = await axios({
             method: method,
@@ -296,6 +301,7 @@ export default class BeFake {
         return response.data;
     }
 
+    // TODO: optimize this function (i think is done without the best way)
     async getFriendsFeed(option: number): Promise<any> {
         /**
          * option:
@@ -304,98 +310,134 @@ export default class BeFake {
          * 2: create path and user folders with data and download images
          */
         const response = await this.apiRequest("GET", "feeds/friends");
-        if (option > 0 && option > 3) {
+        if (option > 0 || option > 3) {
             console.log("Invalid option, please try again");
             return;
         }
+        try {
+            if (option == 0) {
+                console.log(response);
+            }
+            if (option == 1) {
+                await fs.writeFile(
+                    path.join("programData", "friendsFeed.json"),
+                    JSON.stringify(response, null, 4),
+                    () => {
+                        console.log("File created successfully");
+                    }
+                );
+                return;
+            }
+            if (option == 2) {
+                const feedPath = path.join(this.dataPath, "friendsFeed");
+                // Check if the folder exists
+                if (!fs.existsSync(feedPath)) {
+                    // If doesn't exist, create it
+                    fs.mkdirSync(feedPath);
+                } else {
+                    // If exists, delete it and create it again
+                    fs.rmSync(feedPath, { recursive: true });
+                    fs.mkdirSync(feedPath);
+                }
+                for (let i = 0; i < response.length; i++) {
+                    const friendPath = path.join(
+                        feedPath,
+                        response[i].userName
+                    );
+                    // Check if the folder exists
+                    if (!fs.existsSync(friendPath)) {
+                        // If doesn't exist, create it
+                        await fs.mkdirSync(friendPath);
+                    } else {
+                        // If exists, delete it and create it again
+                        fs.rmSync(friendPath, { recursive: true });
+                        fs.mkdirSync(friendPath);
+                    }
+                    // create photos folder
+                    const imagesPath = path.join(friendPath, "images");
+                    if (!fs.existsSync(imagesPath)) {
+                        // If doesn't exist, create it
+                        fs.mkdirSync(imagesPath);
+                    }
+                    // Save user.json info
+                    await fs.writeFile(
+                        path.join(friendPath, "user.json"),
+                        JSON.stringify(response[i], null, 4),
+                        () => {
+                            console.log(
+                                "user.json created successfully",
+                                response[i].userName
+                            );
+                        }
+                    );
+                    //* Save images
+
+                    // Primary image
+                    const primaryImage = await axios.get(response[i].photoURL, {
+                        responseType: "arraybuffer",
+                    });
+                    console.log(primaryImage.data);
+                    await sharp(primaryImage.data)
+                        .toFormat("jpg")
+                        .toFile(path.join(imagesPath, "primary.jpg"));
+
+                    // Secondary image
+                    const secondaryImage = await axios.get(
+                        response[i].secondaryPhotoURL,
+                        {
+                            responseType: "arraybuffer",
+                        }
+                    );
+                    await sharp(secondaryImage.data)
+                        .toFormat("jpg")
+                        .toFile(path.join(imagesPath, "secondary.jpg"));
+
+                    // Profile img
+                    /// if doesn't exist, continue
+                    if (!response[i].user.profilePicture) continue;
+                    const profileImage = await axios.get(
+                        response[i].user.profilePicture.url,
+                        {
+                            responseType: "arraybuffer",
+                        }
+                    );
+                    await sharp(profileImage.data)
+                        .toFormat("jpg")
+                        .toFile(path.join(imagesPath, "profile.jpg"));
+                }
+            }
+            return;
+        } catch (error) {
+            console.log("Something went wrong", error);
+        }
+    }
+
+    async getFriends(option: number): Promise<any> {
+        /**
+         * option:
+         * 0: print data
+         * 1: save JSON file with data
+         * */
+        if (option < 0 || option > 1) {
+            console.log("Invalid option, please try again");
+            return;
+        }
+        const response = await this.apiRequest("GET", "relationships/friends");
         if (option == 0) {
             console.log(response);
-        }
-        if (option == 1) {
+        } else {
+            // check if programData folder exists
+            if (!fs.existsSync("programData")) {
+                // If doesn't exist, create it
+                fs.mkdirSync("programData");
+            }
             await fs.writeFile(
-                path.join("programData", "friendsFeed.json"),
+                path.join("programData", "friends.json"),
                 JSON.stringify(response, null, 4),
                 () => {
                     console.log("File created successfully");
                 }
             );
-            return;
         }
-        if (option == 2) {
-            const feedPath = path.join(this.dataPath, "friendsFeed");
-            // Check if the folder exists
-            if (!fs.existsSync(feedPath)) {
-                // If doesn't exist, create it
-                fs.mkdirSync(feedPath);
-            } else {
-                // If exists, delete it and create it again
-                fs.rmSync(feedPath, { recursive: true });
-                fs.mkdirSync(feedPath);
-            }
-            for (let i = 0; i < response.length; i++) {
-                const friendPath = path.join(feedPath, response[i].userName);
-                // Check if the folder exists
-                if (!fs.existsSync(friendPath)) {
-                    // If doesn't exist, create it
-                    await fs.mkdirSync(friendPath);
-                } else {
-                    // If exists, delete it and create it again
-                    fs.rmSync(friendPath, { recursive: true });
-                    fs.mkdirSync(friendPath);
-                }
-                // create photos folder
-                const imagesPath = path.join(friendPath, "images");
-                if (!fs.existsSync(imagesPath)) {
-                    // If doesn't exist, create it
-                    fs.mkdirSync(imagesPath);
-                }
-                // Save user.json info
-                await fs.writeFile(
-                    path.join(friendPath, "user.json"),
-                    JSON.stringify(response[i], null, 4),
-                    () => {
-                        console.log(
-                            "user.json created successfully",
-                            response[i].userName
-                        );
-                    }
-                );
-                //* Save images
-
-                // Primary image
-                const primaryImage = await axios.get(response[i].photoURL, {
-                    responseType: "arraybuffer",
-                });
-                console.log(primaryImage.data);
-                await sharp(primaryImage.data)
-                    .toFormat("jpg")
-                    .toFile(path.join(imagesPath, "primary.jpg"));
-
-                // Secondary image
-                const secondaryImage = await axios.get(
-                    response[i].secondaryPhotoURL,
-                    {
-                        responseType: "arraybuffer",
-                    }
-                );
-                await sharp(secondaryImage.data)
-                    .toFormat("jpg")
-                    .toFile(path.join(imagesPath, "secondary.jpg"));
-
-                // Profile img
-                /// if doesn't exist, continue
-                if (!response[i].user.profilePicture) continue;
-                const profileImage = await axios.get(
-                    response[i].user.profilePicture.url,
-                    {
-                        responseType: "arraybuffer",
-                    }
-                );
-                await sharp(profileImage.data)
-                    .toFormat("jpg")
-                    .toFile(path.join(imagesPath, "profile.jpg"));
-            }
-        }
-        return;
     }
 }

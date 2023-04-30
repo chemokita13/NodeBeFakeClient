@@ -19,7 +19,7 @@ function myBf() {
     return __awaiter(this, void 0, void 0, function* () {
         const mybd = new BeFake_1.default();
         yield mybd.loadToken();
-        yield mybd.getFriendsFeed(2);
+        yield mybd.getFriends(1);
     });
 }
 myBf();
@@ -27,9 +27,13 @@ myBf();
 /**
  *
   
-      
-  await mybd.sendOtpVonage("+34641564704"); // number random with spain code
+      //* number random with spain code
+        await mybd.sendOtpVonage("+34641564704");
     const otp = input("Enter OTP: ");
     await mybd.verifyOtpVonage(otp);
+
+
+
+     await mybd.getFriendsFeed(2);
  *
  */
