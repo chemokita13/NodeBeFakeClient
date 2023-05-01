@@ -35,7 +35,7 @@ export default class BeFake {
         ///google_api_key?
     ) {
         (this.disable_ssl = false),
-            (this.deviceId = deviceId || this.generateRandomDeviceId()),
+            (this.deviceId = deviceId || this._generateRandomDeviceId()),
             (this.api_url = "https://mobile.bereal.com/api"),
             (this.google_api_key = "AIzaSyDwjfEeparokD7sXPVQli9NsTuhT6fJ6iA"),
             (this.headers = {
@@ -47,7 +47,7 @@ export default class BeFake {
     }
 
     // Generate a random device id, (random string with 16chars)
-    generateRandomDeviceId(): string {
+    _generateRandomDeviceId(): string {
         const characters = "abcdefghijklmnopqrstuvwxyz0123456789";
         let result = "";
         for (let i = 0; i < 16; i++) {
@@ -59,7 +59,7 @@ export default class BeFake {
     }
 
     // Only a getter for debug
-    getSelf(): any {
+    _getSelf(): any {
         return this.otpSession;
     }
 
@@ -67,7 +67,7 @@ export default class BeFake {
     async sendOtpVonage(phoneNumber: string): Promise<void> {
         const data = {
             phoneNumber: phoneNumber,
-            deviceId: this.generateRandomDeviceId(),
+            deviceId: this._generateRandomDeviceId(),
         };
         const response = await axios.post(
             "https://auth.bereal.team/api/vonage/request-code",
@@ -296,7 +296,7 @@ export default class BeFake {
     }
 
     // make all BeReal's API requests
-    async apiRequest(
+    async _apiRequest(
         method: string,
         endpoint: string,
         data?: object,
@@ -323,7 +323,7 @@ export default class BeFake {
          * 1: save JSON file with data
          * 2: create path and user folders with data and download images
          */
-        const response = await this.apiRequest("GET", "feeds/friends");
+        const response = await this._apiRequest("GET", "feeds/friends");
         if (option < 0 || option > 3) {
             console.log("Invalid option, please try again");
             return;
@@ -437,7 +437,7 @@ export default class BeFake {
             console.log("Invalid option, please try again");
             return;
         }
-        const response = await this.apiRequest("GET", "relationships/friends");
+        const response = await this._apiRequest("GET", "relationships/friends");
         if (option == 0) {
             return response;
         } else {
@@ -465,7 +465,7 @@ export default class BeFake {
         const data = {
             content: comment,
         };
-        const response = await this.apiRequest(
+        const response = await this._apiRequest(
             "POST",
             "content/comments",
             data,
@@ -476,7 +476,7 @@ export default class BeFake {
 
     // Get friend suggestions
     async getFriendSuggestions(page?: number): Promise<any> {
-        const response = await this.apiRequest(
+        const response = await this._apiRequest(
             "GET",
             "relationships/suggestions",
             {}, // data empty
@@ -486,21 +486,65 @@ export default class BeFake {
     }
 
     // Post a photo
+    /// equivalente a main.py: post_photo (202)
     async postPhoto(location?: [number, number]) {
         // imgs paths
         const img1Path = path.join(this.dataPath, "post", "img1.jpg");
-        const img2Path = path.join(
-            __dirname,
-            this.dataPath,
-            "post",
-            "img2.jpg"
-        );
+        const img2Path = path.join(this.dataPath, "post", "img2.jpg");
         // create location string (still idk why but yes)
         if (location) {
             const locationStr = `<Location ${location[0]} ${location[1]}>`;
         }
         // Get bytes from imgs
-        const img1Bytes = Buffer.from(fs.readFileSync(img1Path));
-        console.log(img1Bytes);
+        const img2Bytes: Uint8Array = Buffer.from(fs.readFileSync(img2Path));
+        const img1Bytes: Uint8Array = Buffer.from(fs.readFileSync(img1Path));
+
+        // Pass the info to this._createPost()
+        const response = await this._createPost(
+            img1Bytes,
+            img2Bytes,
+            false,
+            "followers",
+            "test",
+            location
+        );
+    }
+
+    /// equivalente a post.py: create_post (58)
+    _createPost(
+        primary: Uint8Array,
+        secondary: Uint8Array,
+        is_late: boolean,
+        visibility: string,
+        caption: string,
+        location?: [number, number],
+        retakes = 0,
+        resize = true,
+        taken_at?: string
+    ) {
+        // if taken_at is not defined, set it to now
+        if (!taken_at) {
+            const now = moment.utc();
+            const taken_at = now.format("YYYY-MM-DDTHH:mm:ss") + "Z";
+        }
+        const postUpload = this._postUpload(primary, secondary, resize);
+    }
+
+    /// equivalente a post_picture.py (constructor [ DE MOMENTO ])
+    // TODO: usar oop en otro archivo pq es interminable esto ://
+    async _postUpload(
+        primary: Uint8Array,
+        secondary: Uint8Array,
+        resize: boolean = true
+    ) {
+        const newSize = [1500, 2000];
+        const primaryImg = await sharp(primary).toBuffer();
+        const secondaryImg = await sharp(secondary).toBuffer();
+
+        // Get de imgs format
+        const img1Format = (await sharp(primaryImg).metadata()).format;
+        const img2Format = (await sharp(secondaryImg).metadata()).format;
+
+        console.log(img1Format, img2Format);
     }
 }
