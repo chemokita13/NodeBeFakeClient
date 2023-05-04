@@ -327,7 +327,7 @@ export default class BeFake {
         if (option < 0 || option > 3) {
             console.log("Invalid option, please try again");
             return;
-        }
+        } //
         try {
             if (option == 0) {
                 return response;
