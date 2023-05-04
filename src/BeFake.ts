@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import sharp from "sharp"; // to download and resize images
 import moment from "moment";
+import { PostUpload } from "./modules/PostUpload";
 
 // TODO: add error codes and etc
 export default class BeFake {
@@ -135,14 +136,14 @@ export default class BeFake {
             // parse the JSON
             const obj = JSON.parse(data);
 
-            // check if token is expired
-            if (
-                !moment(obj.access.expires).isBefore(moment()) ||
-                !moment(obj.firebase.expires).isBefore(moment())
-            ) {
-                console.log("Token expired, please login again");
-                return;
-            }
+            // // check if token is expired
+            // if (
+            //     !moment(obj.access.expires).isBefore(moment()) ||
+            //     !moment(obj.firebase.expires).isBefore(moment())
+            // ) {
+            //     console.log("Token expired, please login again");
+            //     return;
+            // }
 
             // set the tokens
             this.refresh_token = obj.access.refresh_token;
@@ -327,7 +328,7 @@ export default class BeFake {
         if (option < 0 || option > 3) {
             console.log("Invalid option, please try again");
             return;
-        } //
+        }
         try {
             if (option == 0) {
                 return response;
@@ -546,5 +547,7 @@ export default class BeFake {
         const img2Format = (await sharp(secondaryImg).metadata()).format;
 
         console.log(img1Format, img2Format);
+        const hola = new PostUpload(primaryImg, secondaryImg, resize);
+        await hola.upload(this);
     }
 }

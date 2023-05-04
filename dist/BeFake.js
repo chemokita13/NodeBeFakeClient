@@ -40,6 +40,7 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const sharp_1 = __importDefault(require("sharp")); // to download and resize images
 const moment_1 = __importDefault(require("moment"));
+const PostUpload_1 = require("./modules/PostUpload");
 // TODO: add error codes and etc
 class BeFake {
     constructor(refresh_token = null, proxies = null, disable_ssl = false, deviceId = null
@@ -47,7 +48,7 @@ class BeFake {
     ///google_api_key?
     ) {
         (this.disable_ssl = false),
-            (this.deviceId = deviceId || this.generateRandomDeviceId()),
+            (this.deviceId = deviceId || this._generateRandomDeviceId()),
             (this.api_url = "https://mobile.bereal.com/api"),
             (this.google_api_key = "AIzaSyDwjfEeparokD7sXPVQli9NsTuhT6fJ6iA"),
             (this.headers = {
@@ -57,7 +58,7 @@ class BeFake {
         this.dataPath = "programData";
     }
     // Generate a random device id, (random string with 16chars)
-    generateRandomDeviceId() {
+    _generateRandomDeviceId() {
         const characters = "abcdefghijklmnopqrstuvwxyz0123456789";
         let result = "";
         for (let i = 0; i < 16; i++) {
@@ -66,7 +67,7 @@ class BeFake {
         return result;
     }
     // Only a getter for debug
-    getSelf() {
+    _getSelf() {
         return this.otpSession;
     }
     // Send a mobile verification (vonage) code to a phone number via SMS
@@ -74,7 +75,7 @@ class BeFake {
         return __awaiter(this, void 0, void 0, function* () {
             const data = {
                 phoneNumber: phoneNumber,
-                deviceId: this.generateRandomDeviceId(),
+                deviceId: this._generateRandomDeviceId(),
             };
             const response = yield axios_1.default.post("https://auth.bereal.team/api/vonage/request-code", data, {
                 headers: {
@@ -126,12 +127,14 @@ class BeFake {
                 const data = yield fs.readFileSync("./programData/USER_INFO.json", "utf8");
                 // parse the JSON
                 const obj = JSON.parse(data);
-                // check if token is expired
-                if (!(0, moment_1.default)(obj.access.expires).isBefore((0, moment_1.default)()) ||
-                    !(0, moment_1.default)(obj.firebase.expires).isBefore((0, moment_1.default)())) {
-                    console.log("Token expired, please login again");
-                    return;
-                }
+                // // check if token is expired
+                // if (
+                //     !moment(obj.access.expires).isBefore(moment()) ||
+                //     !moment(obj.firebase.expires).isBefore(moment())
+                // ) {
+                //     console.log("Token expired, please login again");
+                //     return;
+                // }
                 // set the tokens
                 this.refresh_token = obj.access.refresh_token;
                 this.token = obj.access.token;
@@ -251,7 +254,7 @@ class BeFake {
         });
     }
     // make all BeReal's API requests
-    apiRequest(method, endpoint, data, params) {
+    _apiRequest(method, endpoint, data, params) {
         return __awaiter(this, void 0, void 0, function* () {
             //?console.log("Requesting " + this.token);
             const response = yield (0, axios_1.default)({
@@ -275,7 +278,7 @@ class BeFake {
              * 1: save JSON file with data
              * 2: create path and user folders with data and download images
              */
-            const response = yield this.apiRequest("GET", "feeds/friends");
+            const response = yield this._apiRequest("GET", "feeds/friends");
             if (option < 0 || option > 3) {
                 console.log("Invalid option, please try again");
                 return;
@@ -371,7 +374,7 @@ class BeFake {
                 console.log("Invalid option, please try again");
                 return;
             }
-            const response = yield this.apiRequest("GET", "relationships/friends");
+            const response = yield this._apiRequest("GET", "relationships/friends");
             if (option == 0) {
                 return response;
             }
@@ -397,32 +400,59 @@ class BeFake {
             const data = {
                 content: comment,
             };
-            const response = yield this.apiRequest("POST", "content/comments", data, payload);
+            const response = yield this._apiRequest("POST", "content/comments", data, payload);
             return response;
         });
     }
     // Get friend suggestions
     getFriendSuggestions(page) {
         return __awaiter(this, void 0, void 0, function* () {
-            const response = yield this.apiRequest("GET", "relationships/suggestions", {}, // data empty
+            const response = yield this._apiRequest("GET", "relationships/suggestions", {}, // data empty
             page ? { page: page } : {} // if page is defined, send it
             );
             return response;
         });
     }
     // Post a photo
+    /// equivalente a main.py: post_photo (202)
     postPhoto(location) {
         return __awaiter(this, void 0, void 0, function* () {
             // imgs paths
             const img1Path = path.join(this.dataPath, "post", "img1.jpg");
-            const img2Path = path.join(__dirname, this.dataPath, "post", "img2.jpg");
+            const img2Path = path.join(this.dataPath, "post", "img2.jpg");
             // create location string (still idk why but yes)
             if (location) {
                 const locationStr = `<Location ${location[0]} ${location[1]}>`;
             }
             // Get bytes from imgs
+            const img2Bytes = Buffer.from(fs.readFileSync(img2Path));
             const img1Bytes = Buffer.from(fs.readFileSync(img1Path));
-            console.log(img1Bytes);
+            // Pass the info to this._createPost()
+            const response = yield this._createPost(img1Bytes, img2Bytes, false, "followers", "test", location);
+        });
+    }
+    /// equivalente a post.py: create_post (58)
+    _createPost(primary, secondary, is_late, visibility, caption, location, retakes = 0, resize = true, taken_at) {
+        // if taken_at is not defined, set it to now
+        if (!taken_at) {
+            const now = moment_1.default.utc();
+            const taken_at = now.format("YYYY-MM-DDTHH:mm:ss") + "Z";
+        }
+        const postUpload = this._postUpload(primary, secondary, resize);
+    }
+    /// equivalente a post_picture.py (constructor [ DE MOMENTO ])
+    // TODO: usar oop en otro archivo pq es interminable esto ://
+    _postUpload(primary, secondary, resize = true) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const newSize = [1500, 2000];
+            const primaryImg = yield (0, sharp_1.default)(primary).toBuffer();
+            const secondaryImg = yield (0, sharp_1.default)(secondary).toBuffer();
+            // Get de imgs format
+            const img1Format = (yield (0, sharp_1.default)(primaryImg).metadata()).format;
+            const img2Format = (yield (0, sharp_1.default)(secondaryImg).metadata()).format;
+            console.log(img1Format, img2Format);
+            const hola = new PostUpload_1.PostUpload(primaryImg, secondaryImg, resize);
+            yield hola.upload(this);
         });
     }
 }
