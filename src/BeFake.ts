@@ -66,7 +66,7 @@ export default class BeFake {
     }
 
     // Send a mobile verification (vonage) code to a phone number via SMS
-    async sendOtpVonage(phoneNumber: string): Promise<void> {
+    async sendOtpVonage(phoneNumber: string): Promise<string> {
         const data = {
             phoneNumber: phoneNumber,
             deviceId: this._generateRandomDeviceId(),
@@ -83,18 +83,19 @@ export default class BeFake {
         );
 
         if (response.status == 200) {
-            console.log(
-                "OTP sent to " + phoneNumber + " successfully, requestId: ",
+            this.otpSession = response.data.vonageRequestId;
+            return (
+                "OTP sent to " +
+                phoneNumber +
+                " successfully, requestId: " +
                 response.data.vonageRequestId
             );
-            this.otpSession = response.data.vonageRequestId;
-            //?console.log(this.getSelf());
         } else {
-            console.log("OTP not sent, error: ", response.data);
+            return "OTP not sent, error: " + response.data;
         }
     }
 
-    async saveToken(): Promise<void> {
+    async saveToken(): Promise<string> {
         // create an object with the tokens and the userId
         const objToSave = {
             access: {
@@ -110,20 +111,22 @@ export default class BeFake {
             userId: this.userId,
         };
 
-        // Check if the folder exists
-        if (!fs.existsSync(this.dataPath)) {
-            // If doesn't exist, create it
-            fs.mkdirSync(this.dataPath);
-        }
-
-        // save the object to a JSON file
-        await fs.writeFile(
-            path.join(this.dataPath, "USER_INFO.json"),
-            JSON.stringify(objToSave, null, 4),
-            () => {
-                console.log("Saved tokens file");
+        try {
+            // Check if the folder exists
+            if (!fs.existsSync(this.dataPath)) {
+                // If doesn't exist, create it
+                fs.mkdirSync(this.dataPath);
             }
-        );
+
+            // save the object to a JSON file
+            await fs.writeFileSync(
+                path.join(this.dataPath, "USER_INFO.json"),
+                JSON.stringify(objToSave, null, 4)
+            );
+            return "token saved successfully";
+        } catch (error) {
+            return error;
+        }
     }
 
     // load the tokens from a JSON file
@@ -164,10 +167,10 @@ export default class BeFake {
     }
 
     // Verify a mobile verification (vonage) code sent to a phone number via SMS
-    async verifyOtpVonage(otpCode: string): Promise<void> {
+    async verifyOtpVonage(otpCode: string): Promise<string> {
         // If there is no otpSession, exit
         if (!this.otpSession) {
-            return;
+            return "No otpSession, please send an OTP first";
         }
 
         const otpVerRes = await axios.post(
@@ -181,78 +184,84 @@ export default class BeFake {
         // TODO: check if the response is 200 or 201
         if (otpVerRes.data.status != 0) {
             console.log("OTP verification failed, error: ", otpVerRes.data);
-            return;
+            return "OTP verification failed, error: " + otpVerRes.data;
         }
 
-        const tokenRes = await axios.post(
-            "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken",
-            {
-                token: otpVerRes.data.token,
-                returnSecureToken: true,
-            },
-            {
-                params: {
-                    key: this.google_api_key,
+        try {
+            const tokenRes = await axios.post(
+                "https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken",
+                {
+                    token: otpVerRes.data.token,
+                    returnSecureToken: true,
                 },
-            }
-        );
+                {
+                    params: {
+                        key: this.google_api_key,
+                    },
+                }
+            );
 
-        if (tokenRes.status !== 200) {
-            console.log("Token verification failed, error: ", tokenRes);
-            return;
+            // if (tokenRes.status !== 200) {
+            //     console.log("Token verification failed, error: ", tokenRes);
+            //     return "Token verification failed, error: " + tokenRes;
+            // }
+
+            // set the token
+            this.firebase_refresh_token = tokenRes.data.refreshToken;
+
+            // refresh the token
+            await this.firebaseRefreshTokens();
+            // grant the access token
+            await this.grantAccessToken();
+            // save user info (tokens, userId...)
+            await this.saveToken();
+            return "OTP verified successfully";
+        } catch (error) {
+            return "Something went wrong, error: " + error;
         }
-
-        // console.log(
-        //     "Token verified successfully, refreshToken: ",
-        //     tokenRes.data.refreshToken
-        // );
-
-        // set the token
-        this.firebase_refresh_token = tokenRes.data.refreshToken;
-
-        // refresh the token
-        await this.firebaseRefreshTokens();
-        // grant the access token
-        await this.grantAccessToken();
-        // save user info (tokens, userId...)
-        await this.saveToken();
     }
 
     // upload the token for avoid expiration
-    async firebaseRefreshTokens(): Promise<void> {
+    async firebaseRefreshTokens(): Promise<any> {
         // If there is no firebase_refresh_token, exit
         if (!this.firebase_refresh_token) {
-            return;
+            return "No firebase_refresh_token, please login first";
         }
 
-        const response = await axios.post(
-            "https://securetoken.googleapis.com/v1/token",
-            {
-                grantType: "refresh_token",
-                refreshToken: this.firebase_refresh_token,
-            },
-            {
-                headers: this.headers,
-                withCredentials: true,
-                params: { key: this.google_api_key },
+        try {
+            const response = await axios.post(
+                "https://securetoken.googleapis.com/v1/token",
+                {
+                    grantType: "refresh_token",
+                    refreshToken: this.firebase_refresh_token,
+                },
+                {
+                    headers: this.headers,
+                    withCredentials: true,
+                    params: { key: this.google_api_key },
+                }
+            );
+
+            // Exception handling
+            if (response.status !== 200) {
+                console.log(
+                    "Token refresh failed(l164), error: ",
+                    response.data
+                );
+                return;
             }
-        );
 
-        // Exception handling
-        if (response.status !== 200) {
-            console.log("Token refresh failed(l164), error: ", response.data);
-            return;
+            //!console.log(response.data.refresh_token);
+            this.firebase_refresh_token = response.data.refresh_token;
+            this.firebaseToken = response.data.id_token;
+            this.firebaseExpiration = moment().add(
+                parseInt(response.data.expires_in),
+                "seconds"
+            );
+            this.userId = response.data.user_id;
+        } catch (error) {
+            return "Something went wrong, error: " + error;
         }
-
-        //!console.log(response.data.refresh_token);
-        this.firebase_refresh_token = response.data.refresh_token;
-        this.firebaseToken = response.data.id_token;
-        this.firebaseExpiration = moment().add(
-            parseInt(response.data.expires_in),
-            "seconds"
-        );
-        this.userId = response.data.user_id;
-        return;
     }
 
     // grant the access token
