@@ -348,7 +348,6 @@ export default class BeFake {
         data?: object,
         params?: object
     ): Promise<any> {
-        //?console.log("Requesting " + this.token);
         const response = await axios({
             method: method,
             url: this.api_url + "/" + endpoint,
@@ -610,5 +609,15 @@ export default class BeFake {
                 data: error,
             };
         }
+    }
+
+    // Delete your post
+    async deletePost(): Promise<BeFakeResponse> {
+        const response = await this._apiRequest("DELETE", "content/posts");
+        return {
+            done: true,
+            msg: "Post deleted successfully",
+            data: response,
+        };
     }
 }
