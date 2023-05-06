@@ -5,7 +5,7 @@
 -   Clone that repo:
 
 ```bash
-git clone https://github.com/chemokita13/NodeBeFakeAPI.git
+git clone https://github.com/chemokita13/NodeBeFakeClient.git
 cd NodeBeFakeAPI
 ```
 
