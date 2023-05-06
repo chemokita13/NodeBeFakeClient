@@ -58,12 +58,17 @@ class Post {
                     longitude: location[1],
                 };
             }
-            const response = yield axios_1.default.post("https://mobile.bereal.com/api/content/posts", json_data, {
-                headers: {
-                    Authorization: `Bearer ${this.beFake.token}`,
-                },
-            });
-            return response;
+            try {
+                const response = yield axios_1.default.post("https://mobile.bereal.com/api/content/posts", json_data, {
+                    headers: {
+                        Authorization: `Bearer ${this.beFake.token}`,
+                    },
+                });
+                return response;
+            }
+            catch (error) {
+                return error;
+            }
         });
     }
 }

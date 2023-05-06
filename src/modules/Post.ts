@@ -65,15 +65,19 @@ export class Post {
             };
         }
 
-        const response = await axios.post(
-            "https://mobile.bereal.com/api/content/posts",
-            json_data,
-            {
-                headers: {
-                    Authorization: `Bearer ${this.beFake.token}`,
-                },
-            }
-        );
-        return response;
+        try {
+            const response = await axios.post(
+                "https://mobile.bereal.com/api/content/posts",
+                json_data,
+                {
+                    headers: {
+                        Authorization: `Bearer ${this.beFake.token}`,
+                    },
+                }
+            );
+            return response;
+        } catch (error) {
+            return error;
+        }
     }
 }

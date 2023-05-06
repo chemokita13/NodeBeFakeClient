@@ -499,23 +499,27 @@ export default class BeFake {
         takenAt?: string,
         location?: [number, number]
     ) {
-        const primaryImg = await sharp(primary).toBuffer();
-        const secondaryImg = await sharp(secondary).toBuffer();
+        try {
+            const primaryImg = await sharp(primary).toBuffer();
+            const secondaryImg = await sharp(secondary).toBuffer();
 
-        const post = new Post(this);
+            const post = new Post(this);
 
-        const postUploaded = await post.createPost(
-            primaryImg,
-            secondaryImg,
-            late,
-            visibility,
-            resize,
-            retakes,
-            caption,
-            takenAt ?? undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
-            location ?? undefined // same as above
-        );
+            const postUploaded = await post.createPost(
+                primaryImg,
+                secondaryImg,
+                late,
+                visibility,
+                resize,
+                retakes,
+                caption,
+                takenAt ?? undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
+                location ?? undefined // same as above
+            );
 
-        return postUploaded;
+            return postUploaded;
+        } catch (error) {
+            return error;
+        }
     }
 }

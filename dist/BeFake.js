@@ -413,16 +413,21 @@ class BeFake {
             return response;
         });
     }
-    // TODO: usar oop en otro archivo pq es interminable esto ://
+    // Post a photo
     postUpload(primary, secondary, resize = true, late = true, visibility = "friends", retakes = 0, caption = "", takenAt, location) {
         return __awaiter(this, void 0, void 0, function* () {
-            const primaryImg = yield (0, sharp_1.default)(primary).toBuffer();
-            const secondaryImg = yield (0, sharp_1.default)(secondary).toBuffer();
-            const post = new Post_1.Post(this);
-            const postUploaded = yield post.createPost(primaryImg, secondaryImg, late, visibility, resize, retakes, caption, takenAt !== null && takenAt !== void 0 ? takenAt : undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
-            location !== null && location !== void 0 ? location : undefined // same as above
-            );
-            return postUploaded;
+            try {
+                const primaryImg = yield (0, sharp_1.default)(primary).toBuffer();
+                const secondaryImg = yield (0, sharp_1.default)(secondary).toBuffer();
+                const post = new Post_1.Post(this);
+                const postUploaded = yield post.createPost(primaryImg, secondaryImg, late, visibility, resize, retakes, caption, takenAt !== null && takenAt !== void 0 ? takenAt : undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
+                location !== null && location !== void 0 ? location : undefined // same as above
+                );
+                return postUploaded;
+            }
+            catch (error) {
+                return error;
+            }
         });
     }
 }
