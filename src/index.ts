@@ -5,8 +5,8 @@ const input = Prompt();
 
 async function myBf() {
     const mybd = new BeFake();
-
     await mybd.loadToken();
+
     console.log(await mybd.postPhoto());
 }
 
@@ -15,11 +15,11 @@ myBf();
 /// IGNORE THIS
 /**
  *    
- *    
- *    
- *    await mybd.sendOtpVonage(number);
+ *      await mybd.sendOtpVonage(number);
     const otp = input("Enter OTP: ");
     await mybd.verifyOtpVonage(otp);
+ *     
+ *    
  *  
       
       //* number random with spain code 

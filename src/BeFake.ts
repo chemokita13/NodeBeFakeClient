@@ -5,6 +5,7 @@ import * as path from "path";
 import sharp from "sharp"; // to download and resize images
 import moment from "moment";
 import { PostUpload } from "./modules/PostUpload";
+import { Post } from "./modules/Post";
 
 // TODO: add error codes and etc
 export default class BeFake {
@@ -538,16 +539,21 @@ export default class BeFake {
         secondary: Uint8Array,
         resize: boolean = true
     ) {
-        const newSize = [1500, 2000];
         const primaryImg = await sharp(primary).toBuffer();
         const secondaryImg = await sharp(secondary).toBuffer();
 
-        // Get de imgs format
-        const img1Format = (await sharp(primaryImg).metadata()).format;
-        const img2Format = (await sharp(secondaryImg).metadata()).format;
+        const post = new Post(this);
 
-        console.log(img1Format, img2Format);
-        const hola = new PostUpload(primaryImg, secondaryImg, resize);
-        await hola.upload(this);
+        const postUploaded = await post.createPost(
+            primaryImg,
+            secondaryImg,
+            false,
+            undefined,
+            undefined,
+            undefined,
+            "holaaa"
+        );
+
+        return postUploaded;
     }
 }

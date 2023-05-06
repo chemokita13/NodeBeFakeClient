@@ -40,7 +40,7 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const sharp_1 = __importDefault(require("sharp")); // to download and resize images
 const moment_1 = __importDefault(require("moment"));
-const PostUpload_1 = require("./modules/PostUpload");
+const Post_1 = require("./modules/Post");
 // TODO: add error codes and etc
 class BeFake {
     constructor(refresh_token = null, proxies = null, disable_ssl = false, deviceId = null
@@ -444,15 +444,11 @@ class BeFake {
     // TODO: usar oop en otro archivo pq es interminable esto ://
     _postUpload(primary, secondary, resize = true) {
         return __awaiter(this, void 0, void 0, function* () {
-            const newSize = [1500, 2000];
             const primaryImg = yield (0, sharp_1.default)(primary).toBuffer();
             const secondaryImg = yield (0, sharp_1.default)(secondary).toBuffer();
-            // Get de imgs format
-            const img1Format = (yield (0, sharp_1.default)(primaryImg).metadata()).format;
-            const img2Format = (yield (0, sharp_1.default)(secondaryImg).metadata()).format;
-            console.log(img1Format, img2Format);
-            const hola = new PostUpload_1.PostUpload(primaryImg, secondaryImg, resize);
-            yield hola.upload(this);
+            const post = new Post_1.Post(this);
+            const postUploaded = yield post.createPost(primaryImg, secondaryImg, false, undefined, undefined, undefined, "holaaa");
+            return postUploaded;
         });
     }
 }

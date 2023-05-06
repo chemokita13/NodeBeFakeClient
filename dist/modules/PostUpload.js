@@ -16,13 +16,21 @@ exports.PostUpload = void 0;
 const sharp_1 = __importDefault(require("sharp"));
 const axios_1 = __importDefault(require("axios"));
 class PostUpload {
-    constructor(primary, secondary, resize) {
+    // Constructor
+    constructor(primary, secondary, late, resize = false, visibility = "friends", retakes = 0, caption // caption is optional
+    ) {
         this.primary = primary;
         this.secondary = secondary;
         this.resize = resize;
-        this.changePhotos();
+        this.late = late;
+        this.visibility = visibility;
+        this.caption = caption;
+        this.retakes = retakes;
+        this.primary_size = [1500, 2000];
+        this.secondary_size = [1500, 2000];
+        this.changePhotos(); // Because cant use await in constructor
     }
-    // Change photos to webp and resize if resize is true
+    // Change photos to webp and resize if resize is true (constructors prolongation)
     changePhotos() {
         return __awaiter(this, void 0, void 0, function* () {
             // Render imgs
@@ -54,6 +62,7 @@ class PostUpload {
             }
         });
     }
+    // Upload photos to server (first steps: get path, urls and headers)
     upload(beFake) {
         return __awaiter(this, void 0, void 0, function* () {
             const response = yield beFake._apiRequest("get", "content/posts/upload-url", {}, { mimeType: "image/webp" });
@@ -64,7 +73,6 @@ class PostUpload {
             let headers2 = response.data[1].headers;
             headers2["Authorization"] = "Bearer " + beFake.token;
             headers2["user-agent"] = beFake.headers["user-agent"];
-            console.log(response.data[1].path);
             const url2 = response.data[1].url;
             const primary_res = yield axios_1.default.put(url1, this.primary, {
                 headers: headers1,
@@ -72,7 +80,10 @@ class PostUpload {
             const secondary_res = yield axios_1.default.put(url2, this.secondary, {
                 headers: headers2,
             });
-            console.log(primary_res, secondary_res);
+            //?console.log(primary_res, secondary_res);
+            this.primaryPath = response.data[0].path;
+            this.secondaryPath = response.data[1].path;
+            return response.data;
         });
     }
 }

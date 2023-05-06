@@ -26,11 +26,11 @@ myBf();
 /// IGNORE THIS
 /**
  *
- *
- *
- *    await mybd.sendOtpVonage(number);
+ *      await mybd.sendOtpVonage(number);
     const otp = input("Enter OTP: ");
     await mybd.verifyOtpVonage(otp);
+ *
+ *
  *
       
       //* number random with spain code
