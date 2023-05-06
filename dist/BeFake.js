@@ -41,7 +41,6 @@ const path = __importStar(require("path"));
 const sharp_1 = __importDefault(require("sharp")); // to download and resize images
 const moment_1 = __importDefault(require("moment"));
 const Post_1 = require("./modules/Post");
-// TODO: add error codes and etc
 class BeFake {
     constructor(refresh_token = null, proxies = null, disable_ssl = false, deviceId = null
     ///api_url?,
@@ -83,12 +82,18 @@ class BeFake {
                 },
             });
             if (response.status == 200) {
-                console.log("OTP sent to " + phoneNumber + " successfully, requestId: ", response.data.vonageRequestId);
                 this.otpSession = response.data.vonageRequestId;
-                //?console.log(this.getSelf());
+                return {
+                    done: true,
+                    msg: "OTP sent successfully",
+                };
             }
             else {
-                console.log("OTP not sent, error: ", response.data);
+                return {
+                    done: false,
+                    msg: "Something went wrong",
+                    data: response,
+                };
             }
         });
     }
@@ -108,15 +113,46 @@ class BeFake {
                 },
                 userId: this.userId,
             };
-            // Check if the folder exists
-            if (!fs.existsSync(this.dataPath)) {
-                // If doesn't exist, create it
-                fs.mkdirSync(this.dataPath);
+            try {
+                // Check if the folder exists
+                if (!fs.existsSync(this.dataPath)) {
+                    // If doesn't exist, create it
+                    fs.mkdirSync(this.dataPath);
+                }
+                // save the object to a JSON file
+                yield fs.writeFileSync(path.join(this.dataPath, "USER_INFO.json"), JSON.stringify(objToSave, null, 4));
+                return {
+                    done: true,
+                    msg: "Tokens saved successfully",
+                };
             }
-            // save the object to a JSON file
-            yield fs.writeFile(path.join(this.dataPath, "USER_INFO.json"), JSON.stringify(objToSave, null, 4), () => {
-                console.log("Saved tokens file");
-            });
+            catch (error) {
+                return {
+                    done: false,
+                    msg: "Something went wrong",
+                    data: error,
+                };
+            }
+        });
+    }
+    refreshToken() {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const response = yield axios_1.default.post("https://auth.bereal.team/token", {
+                    grant_type: "refresh_token",
+                    client_id: "ios",
+                    client_secret: "962D357B-B134-4AB6-8F53-BEA2B7255420",
+                    refresh_token: this.refresh_token,
+                }, {
+                    params: { grant_type: "refresh_token" },
+                });
+                this.token = response.data.access_token;
+                this.expiration = (0, moment_1.default)().add(response.data.expires_in, "seconds");
+                this.refreshToken = response.data.refresh_token;
+            }
+            catch (error) {
+                console.log(error);
+            }
         });
     }
     // load the tokens from a JSON file
@@ -127,14 +163,6 @@ class BeFake {
                 const data = yield fs.readFileSync("./programData/USER_INFO.json", "utf8");
                 // parse the JSON
                 const obj = JSON.parse(data);
-                // // check if token is expired
-                // if (
-                //     !moment(obj.access.expires).isBefore(moment()) ||
-                //     !moment(obj.firebase.expires).isBefore(moment())
-                // ) {
-                //     console.log("Token expired, please login again");
-                //     return;
-                // }
                 // set the tokens
                 this.refresh_token = obj.access.refresh_token;
                 this.token = obj.access.token;
@@ -144,9 +172,20 @@ class BeFake {
                 this.firebaseExpiration = (0, moment_1.default)(obj.firebase.expires);
                 this.userId = obj.userId;
                 console.log("Loaded token successfully");
+                yield this.refreshToken(),
+                    yield this.firebaseRefreshTokens(),
+                    yield this.saveToken();
+                return {
+                    done: true,
+                    msg: "Tokens loaded successfully",
+                };
             }
             catch (error) {
-                console.log("Something went wrong while getting token, please login again", error);
+                return {
+                    done: false,
+                    msg: "Something went wrong",
+                    data: error,
+                };
             }
         });
     }
@@ -155,7 +194,10 @@ class BeFake {
         return __awaiter(this, void 0, void 0, function* () {
             // If there is no otpSession, exit
             if (!this.otpSession) {
-                return;
+                return {
+                    done: false,
+                    msg: "No otpSession",
+                };
             }
             const otpVerRes = yield axios_1.default.post("https://auth.bereal.team/api/vonage/check-code", {
                 vonageRequestId: this.otpSession,
@@ -163,33 +205,41 @@ class BeFake {
             });
             // TODO: check if the response is 200 or 201
             if (otpVerRes.data.status != 0) {
-                console.log("OTP verification failed, error: ", otpVerRes.data);
-                return;
+                return {
+                    done: false,
+                    msg: "OTP verification failed",
+                    data: otpVerRes.data,
+                };
             }
-            const tokenRes = yield axios_1.default.post("https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken", {
-                token: otpVerRes.data.token,
-                returnSecureToken: true,
-            }, {
-                params: {
-                    key: this.google_api_key,
-                },
-            });
-            if (tokenRes.status !== 200) {
-                console.log("Token verification failed, error: ", tokenRes);
-                return;
+            try {
+                const tokenRes = yield axios_1.default.post("https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyCustomToken", {
+                    token: otpVerRes.data.token,
+                    returnSecureToken: true,
+                }, {
+                    params: {
+                        key: this.google_api_key,
+                    },
+                });
+                // set the token
+                this.firebase_refresh_token = tokenRes.data.refreshToken;
+                // refresh the token
+                yield this.firebaseRefreshTokens();
+                // grant the access token
+                yield this.grantAccessToken();
+                // save user info (tokens, userId...)
+                yield this.saveToken();
+                return {
+                    done: true,
+                    msg: "OTP verified successfully",
+                };
             }
-            // console.log(
-            //     "Token verified successfully, refreshToken: ",
-            //     tokenRes.data.refreshToken
-            // );
-            // set the token
-            this.firebase_refresh_token = tokenRes.data.refreshToken;
-            // refresh the token
-            yield this.firebaseRefreshTokens();
-            // grant the access token
-            yield this.grantAccessToken();
-            // save user info (tokens, userId...)
-            yield this.saveToken();
+            catch (error) {
+                return {
+                    done: false,
+                    msg: "Something went wrong",
+                    data: error,
+                };
+            }
         });
     }
     // upload the token for avoid expiration
@@ -197,27 +247,35 @@ class BeFake {
         return __awaiter(this, void 0, void 0, function* () {
             // If there is no firebase_refresh_token, exit
             if (!this.firebase_refresh_token) {
-                return;
+                return "No firebase_refresh_token, please login first";
             }
-            const response = yield axios_1.default.post("https://securetoken.googleapis.com/v1/token", {
-                grantType: "refresh_token",
-                refreshToken: this.firebase_refresh_token,
-            }, {
-                headers: this.headers,
-                withCredentials: true,
-                params: { key: this.google_api_key },
-            });
-            // Exception handling
-            if (response.status !== 200) {
-                console.log("Token refresh failed(l164), error: ", response.data);
-                return;
+            try {
+                const response = yield axios_1.default.post("https://securetoken.googleapis.com/v1/token", {
+                    grantType: "refresh_token",
+                    refreshToken: this.firebase_refresh_token,
+                }, {
+                    headers: this.headers,
+                    withCredentials: true,
+                    params: { key: this.google_api_key },
+                });
+                // Exception handling
+                if (response.status !== 200) {
+                    console.log("Token refresh failed(l164), error: ", response.data);
+                    return;
+                }
+                //!console.log(response.data.refresh_token);
+                this.firebase_refresh_token = response.data.refresh_token;
+                this.firebaseToken = response.data.id_token;
+                this.firebaseExpiration = (0, moment_1.default)().add(parseInt(response.data.expires_in), "seconds");
+                this.userId = response.data.user_id;
             }
-            //!console.log(response.data.refresh_token);
-            this.firebase_refresh_token = response.data.refresh_token;
-            this.firebaseToken = response.data.id_token;
-            this.firebaseExpiration = (0, moment_1.default)().add(parseInt(response.data.expires_in), "seconds");
-            this.userId = response.data.user_id;
-            return;
+            catch (error) {
+                return {
+                    done: false,
+                    msg: "Something went wrong",
+                    data: error,
+                };
+            }
         });
     }
     // grant the access token
@@ -239,17 +297,11 @@ class BeFake {
             });
             // Exception handling
             if (response.status !== 201) {
-                console.log("Token refresh failed, error: ", response.data);
                 return;
             }
-            //!
-            // this.tokenInfo = JSON.parse(
-            //     atob(response.data.access_token.split(".")[1] + "==")
-            // );
             this.refresh_token = response.data.refresh_token;
             this.expiration = (0, moment_1.default)().add(parseInt(response.data.expires_in), "seconds");
             this.token = yield response.data.access_token;
-            console.log("Token granted successfully, token: ", this.token);
             return;
         });
     }
@@ -280,18 +332,27 @@ class BeFake {
              */
             const response = yield this._apiRequest("GET", "feeds/friends");
             if (option < 0 || option > 3) {
-                console.log("Invalid option, please try again");
-                return;
+                return {
+                    done: false,
+                    msg: "Invalid option",
+                };
             }
             try {
                 if (option == 0) {
-                    return response;
+                    return {
+                        done: true,
+                        msg: "Data returned successfully",
+                        data: response,
+                    };
                 }
                 if (option == 1) {
                     yield fs.writeFile(path.join("programData", "friendsFeed.json"), JSON.stringify(response, null, 4), () => {
                         console.log("File created successfully");
                     });
-                    return;
+                    return {
+                        done: true,
+                        msg: "File created successfully",
+                    };
                 }
                 if (option == 2) {
                     const feedPath = path.join(this.dataPath, "friendsFeed");
@@ -355,10 +416,17 @@ class BeFake {
                             .toFile(path.join(imagesPath, "profile.jpg"));
                     }
                 }
-                return;
+                return {
+                    done: true,
+                    msg: "Data saved successfully",
+                };
             }
             catch (error) {
-                console.log("Something went wrong", error);
+                return {
+                    done: false,
+                    msg: "Error saving data",
+                    data: error,
+                };
             }
         });
     }
@@ -371,12 +439,18 @@ class BeFake {
              * 1: save JSON file with data
              * */
             if (option < 0 || option > 1) {
-                console.log("Invalid option, please try again");
-                return;
+                return {
+                    done: false,
+                    msg: "Invalid option",
+                };
             }
             const response = yield this._apiRequest("GET", "relationships/friends");
             if (option == 0) {
-                return response;
+                return {
+                    done: true,
+                    msg: "Data returned successfully",
+                    data: response,
+                };
             }
             else {
                 // check if programData folder exists
@@ -387,6 +461,10 @@ class BeFake {
                 yield fs.writeFile(path.join("programData", "friends.json"), JSON.stringify(response, null, 4), () => {
                     console.log("File created successfully");
                 });
+                return {
+                    done: true,
+                    msg: "File created successfully",
+                };
             }
         });
     }
@@ -401,7 +479,11 @@ class BeFake {
                 content: comment,
             };
             const response = yield this._apiRequest("POST", "content/comments", data, payload);
-            return response;
+            return {
+                done: true,
+                msg: "Comment posted successfully",
+                data: response,
+            };
         });
     }
     // Get friend suggestions
@@ -410,7 +492,11 @@ class BeFake {
             const response = yield this._apiRequest("GET", "relationships/suggestions", {}, // data empty
             page ? { page: page } : {} // if page is defined, send it
             );
-            return response;
+            return {
+                done: true,
+                msg: "Friend suggestions returned successfully",
+                data: response,
+            };
         });
     }
     // Post a photo
@@ -423,10 +509,18 @@ class BeFake {
                 const postUploaded = yield post.createPost(primaryImg, secondaryImg, late, visibility, resize, retakes, caption, takenAt !== null && takenAt !== void 0 ? takenAt : undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
                 location !== null && location !== void 0 ? location : undefined // same as above
                 );
-                return postUploaded;
+                return {
+                    done: true,
+                    msg: "Post uploaded successfully",
+                    data: postUploaded,
+                };
             }
             catch (error) {
-                return error;
+                return {
+                    done: false,
+                    msg: "Error uploading post",
+                    data: error,
+                };
             }
         });
     }

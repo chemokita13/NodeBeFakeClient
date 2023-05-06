@@ -4,10 +4,9 @@ import * as fs from "fs";
 import * as path from "path";
 import sharp from "sharp"; // to download and resize images
 import moment from "moment";
-import { PostUpload } from "./modules/PostUpload";
 import { Post } from "./modules/Post";
+import { BeFakeResponse } from "./types/BeFakeResponse";
 
-// TODO: add error codes and etc
 export default class BeFake {
     // TODO: add the coresponding types
     //* Types
@@ -66,7 +65,7 @@ export default class BeFake {
     }
 
     // Send a mobile verification (vonage) code to a phone number via SMS
-    async sendOtpVonage(phoneNumber: string): Promise<string> {
+    async sendOtpVonage(phoneNumber: string): Promise<BeFakeResponse> {
         const data = {
             phoneNumber: phoneNumber,
             deviceId: this._generateRandomDeviceId(),
@@ -84,18 +83,20 @@ export default class BeFake {
 
         if (response.status == 200) {
             this.otpSession = response.data.vonageRequestId;
-            return (
-                "OTP sent to " +
-                phoneNumber +
-                " successfully, requestId: " +
-                response.data.vonageRequestId
-            );
+            return {
+                done: true,
+                msg: "OTP sent successfully",
+            };
         } else {
-            return "OTP not sent, error: " + response.data;
+            return {
+                done: false,
+                msg: "Something went wrong",
+                data: response,
+            };
         }
     }
 
-    async saveToken(): Promise<string> {
+    async saveToken(): Promise<BeFakeResponse> {
         // create an object with the tokens and the userId
         const objToSave = {
             access: {
@@ -123,14 +124,43 @@ export default class BeFake {
                 path.join(this.dataPath, "USER_INFO.json"),
                 JSON.stringify(objToSave, null, 4)
             );
-            return "token saved successfully";
+            return {
+                done: true,
+                msg: "Tokens saved successfully",
+            };
         } catch (error) {
-            return "Something went wrong, error: " + error;
+            return {
+                done: false,
+                msg: "Something went wrong",
+                data: error,
+            };
+        }
+    }
+
+    async refreshToken(): Promise<void> {
+        try {
+            const response = await axios.post(
+                "https://auth.bereal.team/token",
+                {
+                    grant_type: "refresh_token",
+                    client_id: "ios",
+                    client_secret: "962D357B-B134-4AB6-8F53-BEA2B7255420",
+                    refresh_token: this.refresh_token,
+                },
+                {
+                    params: { grant_type: "refresh_token" },
+                }
+            );
+            this.token = response.data.access_token;
+            this.expiration = moment().add(response.data.expires_in, "seconds");
+            this.refreshToken = response.data.refresh_token;
+        } catch (error) {
+            console.log(error);
         }
     }
 
     // load the tokens from a JSON file
-    async loadToken(): Promise<void> {
+    async loadToken(): Promise<BeFakeResponse> {
         try {
             // read the file
             const data = await fs.readFileSync(
@@ -139,15 +169,6 @@ export default class BeFake {
             );
             // parse the JSON
             const obj = JSON.parse(data);
-
-            // // check if token is expired
-            // if (
-            //     !moment(obj.access.expires).isBefore(moment()) ||
-            //     !moment(obj.firebase.expires).isBefore(moment())
-            // ) {
-            //     console.log("Token expired, please login again");
-            //     return;
-            // }
 
             // set the tokens
             this.refresh_token = obj.access.refresh_token;
@@ -158,19 +179,30 @@ export default class BeFake {
             this.firebaseExpiration = moment(obj.firebase.expires);
             this.userId = obj.userId;
             console.log("Loaded token successfully");
+            await this.refreshToken(),
+                await this.firebaseRefreshTokens(),
+                await this.saveToken();
+            return {
+                done: true,
+                msg: "Tokens loaded successfully",
+            };
         } catch (error) {
-            console.log(
-                "Something went wrong while getting token, please login again",
-                error
-            );
+            return {
+                done: false,
+                msg: "Something went wrong",
+                data: error,
+            };
         }
     }
 
     // Verify a mobile verification (vonage) code sent to a phone number via SMS
-    async verifyOtpVonage(otpCode: string): Promise<string> {
+    async verifyOtpVonage(otpCode: string): Promise<BeFakeResponse> {
         // If there is no otpSession, exit
         if (!this.otpSession) {
-            return "No otpSession, please send an OTP first";
+            return {
+                done: false,
+                msg: "No otpSession",
+            };
         }
 
         const otpVerRes = await axios.post(
@@ -183,8 +215,11 @@ export default class BeFake {
 
         // TODO: check if the response is 200 or 201
         if (otpVerRes.data.status != 0) {
-            console.log("OTP verification failed, error: ", otpVerRes.data);
-            return "OTP verification failed, error: " + otpVerRes.data;
+            return {
+                done: false,
+                msg: "OTP verification failed",
+                data: otpVerRes.data,
+            };
         }
 
         try {
@@ -201,11 +236,6 @@ export default class BeFake {
                 }
             );
 
-            // if (tokenRes.status !== 200) {
-            //     console.log("Token verification failed, error: ", tokenRes);
-            //     return "Token verification failed, error: " + tokenRes;
-            // }
-
             // set the token
             this.firebase_refresh_token = tokenRes.data.refreshToken;
 
@@ -215,9 +245,16 @@ export default class BeFake {
             await this.grantAccessToken();
             // save user info (tokens, userId...)
             await this.saveToken();
-            return "OTP verified successfully";
+            return {
+                done: true,
+                msg: "OTP verified successfully",
+            };
         } catch (error) {
-            return "Something went wrong, error: " + error;
+            return {
+                done: false,
+                msg: "Something went wrong",
+                data: error,
+            };
         }
     }
 
@@ -260,7 +297,11 @@ export default class BeFake {
             );
             this.userId = response.data.user_id;
         } catch (error) {
-            return "Something went wrong, error: " + error;
+            return {
+                done: false,
+                msg: "Something went wrong",
+                data: error,
+            };
         }
     }
 
@@ -288,13 +329,8 @@ export default class BeFake {
 
         // Exception handling
         if (response.status !== 201) {
-            console.log("Token refresh failed, error: ", response.data);
             return;
         }
-        //!
-        // this.tokenInfo = JSON.parse(
-        //     atob(response.data.access_token.split(".")[1] + "==")
-        // );
         this.refresh_token = response.data.refresh_token;
         this.expiration = moment().add(
             parseInt(response.data.expires_in),
@@ -302,7 +338,6 @@ export default class BeFake {
         );
 
         this.token = await response.data.access_token;
-        console.log("Token granted successfully, token: ", this.token);
         return;
     }
 
@@ -327,7 +362,7 @@ export default class BeFake {
     }
 
     // TODO: optimize this function (i think is done without the best way)
-    async getFriendsFeed(option: number): Promise<any> {
+    async getFriendsFeed(option: number): Promise<BeFakeResponse> {
         /**
          * option:
          * 0: return data
@@ -336,12 +371,18 @@ export default class BeFake {
          */
         const response = await this._apiRequest("GET", "feeds/friends");
         if (option < 0 || option > 3) {
-            console.log("Invalid option, please try again");
-            return;
+            return {
+                done: false,
+                msg: "Invalid option",
+            };
         }
         try {
             if (option == 0) {
-                return response;
+                return {
+                    done: true,
+                    msg: "Data returned successfully",
+                    data: response,
+                };
             }
             if (option == 1) {
                 await fs.writeFile(
@@ -351,7 +392,10 @@ export default class BeFake {
                         console.log("File created successfully");
                     }
                 );
-                return;
+                return {
+                    done: true,
+                    msg: "File created successfully",
+                };
             }
             if (option == 2) {
                 const feedPath = path.join(this.dataPath, "friendsFeed");
@@ -431,26 +475,39 @@ export default class BeFake {
                         .toFile(path.join(imagesPath, "profile.jpg"));
                 }
             }
-            return;
+            return {
+                done: true,
+                msg: "Data saved successfully",
+            };
         } catch (error) {
-            console.log("Something went wrong", error);
+            return {
+                done: false,
+                msg: "Error saving data",
+                data: error,
+            };
         }
     }
 
     // Get friends info
-    async getFriends(option: number): Promise<any> {
+    async getFriends(option: number): Promise<BeFakeResponse> {
         /**
          * option:
          * 0: return data
          * 1: save JSON file with data
          * */
         if (option < 0 || option > 1) {
-            console.log("Invalid option, please try again");
-            return;
+            return {
+                done: false,
+                msg: "Invalid option",
+            };
         }
         const response = await this._apiRequest("GET", "relationships/friends");
         if (option == 0) {
-            return response;
+            return {
+                done: true,
+                msg: "Data returned successfully",
+                data: response,
+            };
         } else {
             // check if programData folder exists
             if (!fs.existsSync("programData")) {
@@ -464,11 +521,18 @@ export default class BeFake {
                     console.log("File created successfully");
                 }
             );
+            return {
+                done: true,
+                msg: "File created successfully",
+            };
         }
     }
 
     // Comment a post
-    async commentPost(postId: string, comment: string): Promise<any> {
+    async commentPost(
+        postId: string,
+        comment: string
+    ): Promise<BeFakeResponse> {
         // Prepare the data to send in the request
         const payload = {
             postId: postId,
@@ -482,18 +546,26 @@ export default class BeFake {
             data,
             payload
         );
-        return response;
+        return {
+            done: true,
+            msg: "Comment posted successfully",
+            data: response,
+        };
     }
 
     // Get friend suggestions
-    async getFriendSuggestions(page?: number): Promise<any> {
+    async getFriendSuggestions(page?: number): Promise<BeFakeResponse> {
         const response = await this._apiRequest(
             "GET",
             "relationships/suggestions",
             {}, // data empty
             page ? { page: page } : {} // if page is defined, send it
         );
-        return response;
+        return {
+            done: true,
+            msg: "Friend suggestions returned successfully",
+            data: response,
+        };
     }
 
     // Post a photo
@@ -507,7 +579,7 @@ export default class BeFake {
         caption: string = "",
         takenAt?: string,
         location?: [number, number]
-    ) {
+    ): Promise<BeFakeResponse> {
         try {
             const primaryImg = await sharp(primary).toBuffer();
             const secondaryImg = await sharp(secondary).toBuffer();
@@ -526,9 +598,17 @@ export default class BeFake {
                 location ?? undefined // same as above
             );
 
-            return postUploaded;
+            return {
+                done: true,
+                msg: "Post uploaded successfully",
+                data: postUploaded,
+            };
         } catch (error) {
-            return error;
+            return {
+                done: false,
+                msg: "Error uploading post",
+                data: error,
+            };
         }
     }
 }
