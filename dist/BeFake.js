@@ -308,7 +308,6 @@ class BeFake {
     // make all BeReal's API requests
     _apiRequest(method, endpoint, data, params) {
         return __awaiter(this, void 0, void 0, function* () {
-            //?console.log("Requesting " + this.token);
             const response = yield (0, axios_1.default)({
                 method: method,
                 url: this.api_url + "/" + endpoint,
@@ -522,6 +521,17 @@ class BeFake {
                     data: error,
                 };
             }
+        });
+    }
+    // Delete your post
+    deletePost() {
+        return __awaiter(this, void 0, void 0, function* () {
+            const response = yield this._apiRequest("DELETE", "content/posts");
+            return {
+                done: true,
+                msg: "Post deleted successfully",
+                data: response,
+            };
         });
     }
 }
