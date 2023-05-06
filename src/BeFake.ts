@@ -125,7 +125,7 @@ export default class BeFake {
             );
             return "token saved successfully";
         } catch (error) {
-            return error;
+            return "Something went wrong, error: " + error;
         }
     }
 
