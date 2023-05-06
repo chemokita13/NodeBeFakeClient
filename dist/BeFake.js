@@ -413,41 +413,15 @@ class BeFake {
             return response;
         });
     }
-    // Post a photo
-    /// equivalente a main.py: post_photo (202)
-    postPhoto(location) {
-        return __awaiter(this, void 0, void 0, function* () {
-            // imgs paths
-            const img1Path = path.join(this.dataPath, "post", "img1.jpg");
-            const img2Path = path.join(this.dataPath, "post", "img2.jpg");
-            // create location string (still idk why but yes)
-            if (location) {
-                const locationStr = `<Location ${location[0]} ${location[1]}>`;
-            }
-            // Get bytes from imgs
-            const img2Bytes = Buffer.from(fs.readFileSync(img2Path));
-            const img1Bytes = Buffer.from(fs.readFileSync(img1Path));
-            // Pass the info to this._createPost()
-            const response = yield this._createPost(img1Bytes, img2Bytes, false, "followers", "test", location);
-        });
-    }
-    /// equivalente a post.py: create_post (58)
-    _createPost(primary, secondary, is_late, visibility, caption, location, retakes = 0, resize = true, taken_at) {
-        // if taken_at is not defined, set it to now
-        if (!taken_at) {
-            const now = moment_1.default.utc();
-            const taken_at = now.format("YYYY-MM-DDTHH:mm:ss") + "Z";
-        }
-        const postUpload = this._postUpload(primary, secondary, resize);
-    }
-    /// equivalente a post_picture.py (constructor [ DE MOMENTO ])
     // TODO: usar oop en otro archivo pq es interminable esto ://
-    _postUpload(primary, secondary, resize = true) {
+    postUpload(primary, secondary, resize = true, late = true, visibility = "friends", retakes = 0, caption = "", takenAt, location) {
         return __awaiter(this, void 0, void 0, function* () {
             const primaryImg = yield (0, sharp_1.default)(primary).toBuffer();
             const secondaryImg = yield (0, sharp_1.default)(secondary).toBuffer();
             const post = new Post_1.Post(this);
-            const postUploaded = yield post.createPost(primaryImg, secondaryImg, false, undefined, undefined, undefined, "holaaa");
+            const postUploaded = yield post.createPost(primaryImg, secondaryImg, late, visibility, resize, retakes, caption, takenAt !== null && takenAt !== void 0 ? takenAt : undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
+            location !== null && location !== void 0 ? location : undefined // same as above
+            );
             return postUploaded;
         });
     }

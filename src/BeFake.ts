@@ -488,56 +488,16 @@ export default class BeFake {
     }
 
     // Post a photo
-    /// equivalente a main.py: post_photo (202)
-    async postPhoto(location?: [number, number]) {
-        // imgs paths
-        const img1Path = path.join(this.dataPath, "post", "img1.jpg");
-        const img2Path = path.join(this.dataPath, "post", "img2.jpg");
-        // create location string (still idk why but yes)
-        if (location) {
-            const locationStr = `<Location ${location[0]} ${location[1]}>`;
-        }
-        // Get bytes from imgs
-        const img2Bytes: Uint8Array = Buffer.from(fs.readFileSync(img2Path));
-        const img1Bytes: Uint8Array = Buffer.from(fs.readFileSync(img1Path));
-
-        // Pass the info to this._createPost()
-        const response = await this._createPost(
-            img1Bytes,
-            img2Bytes,
-            false,
-            "followers",
-            "test",
-            location
-        );
-    }
-
-    /// equivalente a post.py: create_post (58)
-    _createPost(
+    async postUpload(
         primary: Uint8Array,
         secondary: Uint8Array,
-        is_late: boolean,
-        visibility: string,
-        caption: string,
-        location?: [number, number],
-        retakes = 0,
-        resize = true,
-        taken_at?: string
-    ) {
-        // if taken_at is not defined, set it to now
-        if (!taken_at) {
-            const now = moment.utc();
-            const taken_at = now.format("YYYY-MM-DDTHH:mm:ss") + "Z";
-        }
-        const postUpload = this._postUpload(primary, secondary, resize);
-    }
-
-    /// equivalente a post_picture.py (constructor [ DE MOMENTO ])
-    // TODO: usar oop en otro archivo pq es interminable esto ://
-    async _postUpload(
-        primary: Uint8Array,
-        secondary: Uint8Array,
-        resize: boolean = true
+        resize: boolean = true,
+        late: boolean = true,
+        visibility: string = "friends",
+        retakes: number = 0,
+        caption: string = "",
+        takenAt?: string,
+        location?: [number, number]
     ) {
         const primaryImg = await sharp(primary).toBuffer();
         const secondaryImg = await sharp(secondary).toBuffer();
@@ -547,11 +507,13 @@ export default class BeFake {
         const postUploaded = await post.createPost(
             primaryImg,
             secondaryImg,
-            false,
-            undefined,
-            undefined,
-            undefined,
-            "holaaa"
+            late,
+            visibility,
+            resize,
+            retakes,
+            caption,
+            takenAt ?? undefined, // if takenAt is defined, send it but if not, send undefined (dont sent anything)
+            location ?? undefined // same as above
         );
 
         return postUploaded;

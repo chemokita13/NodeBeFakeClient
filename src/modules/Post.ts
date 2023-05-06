@@ -20,12 +20,15 @@ export class Post {
         visibility: string = "friends",
         resize: boolean = true,
         retakes: number = 0,
-        caption?: string // caption is optional
+        caption?: string, // caption is optional
+        taken_at?: string,
+        location?: [number, number]
     ): Promise<any> {
-        const _now = moment().utc();
-        const taken_at = `${_now.format("YYYY-MM-DD")}T${_now.format(
-            "HH:mm:ss"
-        )}Z`;
+        if (!taken_at) {
+            taken_at = moment().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+        } else {
+            taken_at = moment(taken_at).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+        }
         const postUpload = new PostUpload(
             primary,
             secondary,
@@ -36,7 +39,7 @@ export class Post {
             caption
         );
         await postUpload.upload(this.beFake);
-        const json_data = {
+        let json_data: any = {
             isLate: late,
             retakeCounter: retakes,
             takenAt: taken_at,
@@ -55,6 +58,12 @@ export class Post {
                 path: postUpload.secondaryPath,
             },
         };
+        if (location) {
+            json_data["location"] = {
+                latitude: location[0],
+                longitude: location[1],
+            };
+        }
 
         const response = await axios.post(
             "https://mobile.bereal.com/api/content/posts",

@@ -22,14 +22,18 @@ class Post {
         this.beFake = beFake;
     }
     // create post function
-    createPost(primary, secondary, late, visibility = "friends", resize = true, retakes = 0, caption // caption is optional
-    ) {
+    createPost(primary, secondary, late, visibility = "friends", resize = true, retakes = 0, caption, // caption is optional
+    taken_at, location) {
         return __awaiter(this, void 0, void 0, function* () {
-            const _now = (0, moment_1.default)().utc();
-            const taken_at = `${_now.format("YYYY-MM-DD")}T${_now.format("HH:mm:ss")}Z`;
+            if (!taken_at) {
+                taken_at = (0, moment_1.default)().format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+            }
+            else {
+                taken_at = (0, moment_1.default)(taken_at).format("YYYY-MM-DDTHH:mm:ss.SSS[Z]");
+            }
             const postUpload = new PostUpload_1.PostUpload(primary, secondary, late, resize, visibility, retakes, caption);
             yield postUpload.upload(this.beFake);
-            const json_data = {
+            let json_data = {
                 isLate: late,
                 retakeCounter: retakes,
                 takenAt: taken_at,
@@ -48,6 +52,12 @@ class Post {
                     path: postUpload.secondaryPath,
                 },
             };
+            if (location) {
+                json_data["location"] = {
+                    latitude: location[0],
+                    longitude: location[1],
+                };
+            }
             const response = yield axios_1.default.post("https://mobile.bereal.com/api/content/posts", json_data, {
                 headers: {
                     Authorization: `Bearer ${this.beFake.token}`,
