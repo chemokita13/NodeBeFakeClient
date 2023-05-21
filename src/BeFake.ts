@@ -368,13 +368,43 @@ export default class BeFake {
          * 1: save JSON file with data
          * 2: create path and user folders with data and download images
          */
-        const response = await this._apiRequest("GET", "feeds/friends");
+        const response = await this._apiRequest("GET", "feeds/friends-v1");
         if (option < 0 || option > 3) {
             return {
                 done: false,
                 msg: "Invalid option",
             };
         }
+        const saveImg = async (url: string, path: string) => {
+            const buffer = await axios.get(url, {
+                responseType: "arraybuffer",
+            });
+            await sharp(buffer.data).toFormat("jpg").toFile(path);
+        };
+
+        const savePost = async (post: any, postPath: string) => {
+            // Check if the folder exists
+            if (!fs.existsSync(postPath)) {
+                // If doesn't exist, create it
+                fs.mkdirSync(postPath);
+            } else {
+                // If exists, delete it and create it again
+                fs.rmSync(postPath, { recursive: true });
+                fs.mkdirSync(postPath);
+            }
+            // Save primary img
+            await saveImg(post.primary.url, path.join(postPath, "primary.jpg"));
+            // Save secondary img
+            await saveImg(
+                post.secondary.url,
+                path.join(postPath, "secondary.jpg")
+            );
+            // Save post.json
+            fs.writeFileSync(
+                path.join(postPath, "post.json"),
+                JSON.stringify(post, null, 4)
+            );
+        };
         try {
             if (option == 0) {
                 return {
@@ -407,71 +437,66 @@ export default class BeFake {
                     fs.rmSync(feedPath, { recursive: true });
                     fs.mkdirSync(feedPath);
                 }
-                for (let i = 0; i < response.length; i++) {
-                    const friendPath = path.join(
-                        feedPath,
-                        response[i].userName
+                // User posts
+                const userPath = path.join(feedPath, "user");
+                if (!fs.existsSync(userPath)) {
+                    // If doesn't exist, create it
+                    fs.mkdirSync(userPath);
+                } else {
+                    // If exists, delete it and create it again
+                    fs.rmSync(userPath, { recursive: true });
+                    fs.mkdirSync(userPath);
+                }
+
+                // Save user.json
+                fs.writeFileSync(
+                    path.join(userPath, "user.json"),
+                    JSON.stringify(response.userPosts.user, null, 4)
+                );
+
+                // Map user posts
+                for (let i = 0; i < response.userPosts.posts.length; i++) {
+                    const post = response.userPosts.posts[i];
+                    const postPath = path.join(userPath, post.id);
+                    await savePost(post, postPath);
+                }
+
+                // Friends posts
+                const friendsPath = path.join(feedPath, "friends");
+                if (!fs.existsSync(friendsPath)) {
+                    // If doesn't exist, create it
+                    fs.mkdirSync(friendsPath);
+                } else {
+                    // If exists, delete it and create it again
+                    fs.rmSync(friendsPath, { recursive: true });
+                    fs.mkdirSync(friendsPath);
+                }
+                // Map friends posts
+                for (let i = 0; i < response.friendsPosts.length; i++) {
+                    const UserPost = response.friendsPosts[i];
+                    const postPath = path.join(
+                        friendsPath,
+                        UserPost.user.username
                     );
-                    // Check if the folder exists
-                    if (!fs.existsSync(friendPath)) {
+                    if (!fs.existsSync(postPath)) {
                         // If doesn't exist, create it
-                        await fs.mkdirSync(friendPath);
+                        fs.mkdirSync(postPath);
                     } else {
                         // If exists, delete it and create it again
-                        fs.rmSync(friendPath, { recursive: true });
-                        fs.mkdirSync(friendPath);
+                        fs.rmSync(postPath, { recursive: true });
+                        fs.mkdirSync(postPath);
                     }
-                    // create photos folder
-                    const imagesPath = path.join(friendPath, "images");
-                    if (!fs.existsSync(imagesPath)) {
-                        // If doesn't exist, create it
-                        fs.mkdirSync(imagesPath);
+                    // Save user.json
+                    fs.writeFileSync(
+                        path.join(postPath, "user.json"),
+                        JSON.stringify(UserPost.user, null, 4)
+                    );
+                    // Map user posts
+                    for (let j = 0; j < UserPost.posts.length; j++) {
+                        const post = UserPost.posts[j];
+                        const Path = path.join(postPath, post.id);
+                        await savePost(post, Path);
                     }
-                    // Save user.json info
-                    await fs.writeFile(
-                        path.join(friendPath, "user.json"),
-                        JSON.stringify(response[i], null, 4),
-                        () => {
-                            console.log(
-                                "user.json created successfully",
-                                response[i].userName
-                            );
-                        }
-                    );
-                    //* Save images
-
-                    // Primary image
-                    const primaryImage = await axios.get(response[i].photoURL, {
-                        responseType: "arraybuffer",
-                    });
-                    console.log(primaryImage.data);
-                    await sharp(primaryImage.data)
-                        .toFormat("jpg")
-                        .toFile(path.join(imagesPath, "primary.jpg"));
-
-                    // Secondary image
-                    const secondaryImage = await axios.get(
-                        response[i].secondaryPhotoURL,
-                        {
-                            responseType: "arraybuffer",
-                        }
-                    );
-                    await sharp(secondaryImage.data)
-                        .toFormat("jpg")
-                        .toFile(path.join(imagesPath, "secondary.jpg"));
-
-                    // Profile img
-                    /// if doesn't exist, continue
-                    if (!response[i].user.profilePicture) continue;
-                    const profileImage = await axios.get(
-                        response[i].user.profilePicture.url,
-                        {
-                            responseType: "arraybuffer",
-                        }
-                    );
-                    await sharp(profileImage.data)
-                        .toFormat("jpg")
-                        .toFile(path.join(imagesPath, "profile.jpg"));
                 }
             }
             return {
@@ -617,6 +642,16 @@ export default class BeFake {
         return {
             done: true,
             msg: "Post deleted successfully",
+            data: response,
+        };
+    }
+
+    // Get your profile
+    async getProfile(): Promise<BeFakeResponse> {
+        const response = await this._apiRequest("GET", "person/me");
+        return {
+            done: true,
+            msg: "Profile returned successfully",
             data: response,
         };
     }
