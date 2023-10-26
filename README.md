@@ -1,5 +1,7 @@
 # BeReal client (not official)
 
+⚠️DEPRECATED, see my [BeRealAPI](https://github.com/chemokita13/beReal-api)⚠️
+
 ## Instalation
 
 -   Clone that repo:
